@@ -14,6 +14,7 @@ import { createMemoryTool } from './tools/memory-tool.js';
 import { selfEvolveTool, getPersona } from './tools/self-evolve.js';
 import { toolCreatorTool, loadAllCustomTools } from './tools/tool-creator.js';
 import { rateLimit, sanitizeInput, securityHeaders, generateToken, tokenAuth } from './security.js';
+import { Orchestrator, builtInRoles } from './swarm/index.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
@@ -198,13 +199,72 @@ app.delete('/api/memory/:id', (req, res) => {
     const deleted = memory.deleteFact(req.params.id);
     res.json({ success: deleted });
 });
+// Swarm execution endpoint
+app.post('/api/swarm', async (req, res) => {
+    const { goal, plan, protocol } = req.body;
+    if (!goal && !plan) {
+        return res.status(400).json({ error: 'Goal or plan required' });
+    }
+    const orchestrator = new Orchestrator({
+        apiKey: OPENROUTER_API_KEY,
+        defaultModel: 'anthropic/claude-sonnet-4',
+        roles: [], // Use built-in roles
+        maxTurnsPerAgent: 5,
+        maxTotalTurns: 30,
+        onThinking: (roleId, thinking) => {
+            console.log(`[${roleId}] thinking...`);
+        },
+        onAgentStart: (roleId, task) => {
+            console.log(`[${roleId}] starting: ${task.description}`);
+        },
+        onAgentComplete: (roleId, task) => {
+            console.log(`[${roleId}] complete`);
+        },
+    });
+    try {
+        let result;
+        if (plan) {
+            // Execute provided plan
+            const swarmPlan = {
+                goal: plan.goal || goal,
+                protocol: plan.protocol || protocol || 'sequential',
+                tasks: (plan.tasks || []).map((t, i) => ({
+                    id: t.id || `t${i + 1}`,
+                    description: t.description || '',
+                    assignedTo: t.assignedTo || 'coder',
+                    dependencies: t.dependencies || [],
+                    status: 'pending',
+                })),
+            };
+            result = await orchestrator.executePlan(swarmPlan);
+            result = { ...result, timing: { startedAt: Date.now(), completedAt: Date.now(), durationMs: 0 } };
+        }
+        else {
+            // Auto-plan and execute
+            result = await orchestrator.execute(sanitizeInput(goal));
+        }
+        res.json(result);
+    }
+    catch (error) {
+        console.error('Swarm error:', error);
+        res.status(500).json({ error: 'Swarm execution failed' });
+    }
+});
+// Get available swarm roles
+app.get('/api/swarm/roles', (req, res) => {
+    res.json(Object.values(builtInRoles).map(r => ({
+        id: r.id,
+        name: r.name,
+        description: r.description,
+    })));
+});
 // Health check
 app.get('/api/health', (req, res) => {
     const persona = getPersona();
     const customTools = loadAllCustomTools();
     res.json({
         status: 'ok',
-        version: '0.3.0',
+        version: '0.4.0',
         model: 'anthropic/claude-sonnet-4',
         sessions: sessions.size,
         facts: memory.getFacts().length,
@@ -214,13 +274,20 @@ app.get('/api/health', (req, res) => {
             rulesCount: persona.rules.length,
         },
         customTools: customTools.length,
+        swarm: {
+            enabled: true,
+            roles: Object.keys(builtInRoles),
+            protocols: ['sequential', 'parallel', 'debate'],
+        },
     });
 });
 app.listen(PORT, '0.0.0.0', () => {
     const persona = getPersona();
     const customTools = loadAllCustomTools();
-    console.log(`\n⚒️  Forge v0.3 running at http://localhost:${PORT}`);
-    console.log(`   Features: self-evolution, thinking stream, tool creation`);
+    console.log(`\n⚒️  Forge v0.4 running at http://localhost:${PORT}`);
+    console.log(`   Features: self-evolution, thinking stream, tool creation, agent swarm`);
+    console.log(`   Swarm roles: ${Object.keys(builtInRoles).join(', ')}`);
+    console.log(`   Protocols: sequential, parallel, debate`);
     console.log(`   Persona: v${persona.version} (${persona.traits.join(', ')})`);
     console.log(`   Memory: ${memory.getFacts().length} facts`);
     console.log(`   Custom tools: ${customTools.length}`);

@@ -1,6 +1,6 @@
 {
   "name": "@ryanhelton/forge",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Self-evolving AI agent framework - built from scratch",
   "type": "module",
   "main": "dist/index.js",

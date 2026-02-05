@@ -46,6 +46,49 @@ Forge can build its own tools:
 - Input sanitization
 - Security headers
 
+### 🐝 Agent Swarm (v0.4+)
+Multiple specialized agents collaborate on complex tasks:
+
+**Built-in Roles:**
+| Role | Purpose |
+|------|---------|
+| `planner` | Decomposes tasks into subtasks |
+| `researcher` | Gathers information, explores approaches |
+| `coder` | Implements solutions |
+| `critic` | Reviews work, identifies issues |
+| `synthesizer` | Combines outputs into final result |
+
+**Execution Protocols:**
+- `sequential` — Tasks run one after another (A → B → C)
+- `parallel` — Independent tasks run concurrently (A + B + C → merge)
+- `debate` — Propose/critique/refine loop until approved
+
+**Example:**
+```typescript
+import { Orchestrator } from '@ryanhelton/forge';
+
+const orchestrator = new Orchestrator({
+  apiKey: process.env.OPENROUTER_API_KEY,
+  defaultModel: 'anthropic/claude-sonnet-4',
+  roles: [], // Use built-in roles
+});
+
+const result = await orchestrator.execute(
+  'Build a REST API for managing todos with validation'
+);
+
+console.log(result.finalOutput);
+console.log(result.blackboard); // Shared findings/artifacts
+```
+
+**API Endpoint:**
+```bash
+curl -X POST http://localhost:3030/api/swarm \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"goal": "Create an email validation function with tests"}'
+```
+
 ## Commands
 
 ```bash
@@ -147,9 +190,43 @@ forge/
 │   ├── memory.ts      # Persistent memory
 │   ├── security.ts    # Auth & rate limiting
 │   ├── server.ts      # Express server
-│   └── tools/         # Built-in tools
+│   ├── tools/         # Built-in tools
+│   └── swarm/         # Multi-agent orchestration
+│       ├── types.ts       # SwarmConfig, AgentRole, etc.
+│       ├── roles.ts       # Built-in agent roles
+│       ├── blackboard.ts  # Shared agent workspace
+│       └── orchestrator.ts # Swarm coordinator
 ├── public/            # Web UI
 └── package.json
+```
+
+### Swarm Architecture
+
+```
+           ┌─────────────┐
+           │ Orchestrator │
+           └──────┬──────┘
+                  │ decomposes task
+                  ▼
+           ┌─────────────┐
+           │   Planner   │
+           └──────┬──────┘
+                  │ creates plan
+        ┌─────────┼─────────┐
+        ▼         ▼         ▼
+   ┌─────────┐ ┌─────────┐ ┌─────────┐
+   │Researcher│ │  Coder  │ │ Critic  │
+   └────┬────┘ └────┬────┘ └────┬────┘
+        │           │           │
+        └───────────┼───────────┘
+                    ▼
+             ┌─────────────┐
+             │ Blackboard  │  ← shared workspace
+             └──────┬──────┘
+                    ▼
+             ┌─────────────┐
+             │ Synthesizer │
+             └─────────────┘
 ```
 
 ## Why "Forge"?
