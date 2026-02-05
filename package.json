@@ -1,0 +1,59 @@
+{
+  "name": "@ryanhelton/forge",
+  "version": "0.3.0",
+  "description": "Self-evolving AI agent framework - built from scratch",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "forge": "./bin/forge.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "tsx src/server.ts",
+    "chat": "tsx src/cli.ts",
+    "web": "tsx src/server.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "llm",
+    "claude",
+    "openrouter",
+    "self-evolving",
+    "tool-use"
+  ],
+  "author": "Ryan Helton",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ryanhelton/forge.git"
+  },
+  "homepage": "https://github.com/ryanhelton/forge#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "public",
+    "README.md"
+  ],
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "helmet": "^8.0.0",
+    "rate-limiter-flexible": "^5.0.4",
+    "uuid": "^11.0.5"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.10.10",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}
