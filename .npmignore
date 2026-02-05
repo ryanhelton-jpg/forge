@@ -1,0 +1,22 @@
+# Source files (dist is published)
+src/
+
+# Config and data
+.env
+data/
+*.log
+
+# Dev files
+.git/
+.gitignore
+tsconfig.json
+*.ts
+!dist/*.d.ts
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

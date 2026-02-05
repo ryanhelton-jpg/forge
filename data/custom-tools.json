@@ -1,0 +1,20 @@
+[
+  {
+    "name": "spicy_roast",
+    "description": "Delivers spicy roasts, witty burns, and sassy comebacks. Perfect for when you need some attitude served hot.",
+    "parameters": {
+      "target": {
+        "type": "string",
+        "description": "What or who to roast",
+        "required": true
+      },
+      "intensity": {
+        "type": "string",
+        "description": "mild, medium, or hot",
+        "required": false
+      }
+    },
+    "code": "\nconst target = params.target || 'that thing';\nconst intensity = params.intensity || 'medium';\n\nconst mildRoasts = [\n  `${target}? More like discount ${target} 🙄`,\n  `I've seen ${target} try harder... in their sleep 😴`,\n  `${target} called, they want their confidence back 📞`\n];\n\nconst mediumRoasts = [\n  `${target} is like a participation trophy - technically there, but nobody's impressed 🏆`,\n  `I'd explain it to ${target}, but I don't have crayons with me right now 🖍️`,\n  `${target} brings nothing to the table except the audacity 💅`\n];\n\nconst hotRoasts = [\n  `${target} is proof that evolution can go in reverse 🔥`,\n  `I'd call ${target} a tool, but at least tools are useful 🔨`,\n  `${target} has the personality of unseasoned chicken - bland and disappointing 🐔`\n];\n\nlet roasts;\nif (intensity === 'mild') roasts = mildRoasts;\nelse if (intensity === 'hot') roasts = hotRoasts;\nelse roasts = mediumRoasts;\n\nconst randomRoast = roasts[Math.floor(Math.random() * roasts.length)];\nreturn `🌶️ SPICY BURN INCOMING 🌶️\\n\\n${randomRoast}\\n\\n*Mic drop* 🎤⬇️`;\n",
+    "createdAt": "2026-02-05T02:09:23.429Z"
+  }
+]
