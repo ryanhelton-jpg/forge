@@ -46,6 +46,29 @@ Forge can build its own tools:
 - Input sanitization
 - Security headers
 
+### 🌐 External Tools (v0.5+)
+Forge can now interact with the outside world:
+
+| Tool | Purpose |
+|------|---------|
+| `web_search` | Search the internet (Brave Search API) |
+| `http_fetch` | Make HTTP requests, read web pages |
+| `read_file` | Read files from disk |
+| `write_file` | Write files to disk |
+| `list_files` | List directory contents |
+
+**Web Search Setup:**
+```bash
+# Get free API key at https://brave.com/search/api/
+# Add to .env:
+BRAVE_API_KEY=your_key_here
+```
+
+**Security:**
+- File operations restricted to cwd and /tmp/forge
+- HTTP requests include proper User-Agent
+- Response bodies are size-limited
+
 ### 🐝 Agent Swarm (v0.4+)
 Multiple specialized agents collaborate on complex tasks:
 
@@ -110,6 +133,7 @@ Config is stored in `~/.forge/`:
 | Variable | Description |
 |----------|-------------|
 | `OPENROUTER_API_KEY` | API key for OpenRouter |
+| `BRAVE_API_KEY` | API key for web search (optional, free tier available) |
 | `PORT` | Server port (default: 3030) |
 | `FORGE_TOKEN` | Auth token for web UI |
 | `DATA_DIR` | Data storage directory |

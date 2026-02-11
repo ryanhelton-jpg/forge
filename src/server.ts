@@ -14,6 +14,9 @@ import { datetimeTool } from './tools/datetime.js';
 import { createMemoryTool } from './tools/memory-tool.js';
 import { selfEvolveTool, getPersona } from './tools/self-evolve.js';
 import { toolCreatorTool, loadAllCustomTools } from './tools/tool-creator.js';
+import { webSearchTool } from './tools/web-search.js';
+import { httpFetchTool } from './tools/http-fetch.js';
+import { readFileTool, writeFileTool, listFilesTool } from './tools/file-ops.js';
 import { rateLimit, sanitizeInput, securityHeaders, generateToken, tokenAuth } from './security.js';
 import { Orchestrator, builtInRoles } from './swarm/index.js';
 import type { SwarmPlan, SwarmTask, BlackboardEntry } from './swarm/types.js';
@@ -119,6 +122,13 @@ function getOrCreateSession(sessionId: string): Agent {
     agent.registerTool(createMemoryTool(memory));
     agent.registerTool(selfEvolveTool);
     agent.registerTool(toolCreatorTool);
+    
+    // External tools (v0.5)
+    agent.registerTool(webSearchTool);
+    agent.registerTool(httpFetchTool);
+    agent.registerTool(readFileTool);
+    agent.registerTool(writeFileTool);
+    agent.registerTool(listFilesTool);
 
     // Load and register custom tools
     const customTools = loadAllCustomTools();
