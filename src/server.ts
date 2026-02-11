@@ -1019,7 +1019,7 @@ app.get('/api/health', (req, res) => {
   
   res.json({ 
     status: 'ok', 
-    version: '0.5.0',
+    version: '0.5.1',
     model: 'anthropic/claude-sonnet-4',
     sessions: sessions.size,
     facts: memory.getFacts().length,

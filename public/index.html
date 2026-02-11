@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Forge</title>
+  <title>Forge — Self-Evolving AI</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -305,7 +305,7 @@
 </head>
 <body>
   <header>
-    <h1>⚒️ Forge <span>v0.5</span></h1>
+    <h1>⚒️ Forge <span>v0.5.1</span></h1>
     <div class="header-actions">
       <button class="btn" onclick="toggleSidebar()">Config</button>
       <button class="btn" onclick="newChat()">New Chat</button>
@@ -315,11 +315,14 @@
   <div id="chat">
     <div class="empty-state">
       <div class="logo">⚒️</div>
-      <div>Self-evolving AI agent</div>
+      <div style="font-size: 1.2rem; margin-bottom: 0.5rem;">Self-evolving AI agent</div>
+      <div style="color: #666; font-size: 0.9rem; margin-bottom: 1rem;">I learn from feedback and adapt my personality over time</div>
       <div class="feature-badges">
-        <span class="badge">🧬 Self-Evolution</span>
+        <span class="badge">🧬 Evolution</span>
         <span class="badge">🧠 Thinking</span>
-        <span class="badge">🔧 Tool Creation</span>
+        <span class="badge">🔧 Tools</span>
+        <span class="badge">🐝 Swarm</span>
+        <span class="badge">📊 Fitness</span>
       </div>
     </div>
   </div>
@@ -331,6 +334,7 @@
 
   <div class="status-bar">
     <span id="session-status">New session</span>
+    <span id="genome-status">Genome: loading...</span>
     <span id="persona-status">Loading...</span>
   </div>
 
@@ -711,6 +715,12 @@
             <button class="btn" onclick="showRollback()" title="Rollback version">⏪ Rollback</button>
           </div>
         `;
+        
+        // Update genome status in status bar
+        const fitnessEmoji = genome.fitness && genome.fitness.overall >= 0.7 ? '💚' : 
+                           genome.fitness && genome.fitness.overall >= 0.4 ? '💛' : 
+                           genome.fitness ? '❤️' : '⚪';
+        document.getElementById('genome-status').textContent = `Genome v${genome.version} ${fitnessEmoji}`;
       } catch {}
 
       // Load memory

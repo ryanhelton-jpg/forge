@@ -2,7 +2,7 @@
 
 **Self-evolving AI agent framework — built from scratch.**
 
-An AI agent that can modify its own personality, create its own tools, and show you its thinking. No magic. No bloat.
+An AI agent that can modify its own personality, create its own tools, track its fitness, and evolve based on feedback. No magic. No bloat.
 
 ## Quick Start
 
@@ -21,169 +21,164 @@ Then open `http://localhost:3030` and enter your auth token.
 
 ## Features
 
-### 🧬 Self-Evolution
-Forge can modify its own behavior:
-- **Add traits** — "Be more sarcastic" 
-- **Add rules** — "Always ask clarifying questions"
-- **Rewrite its core identity** — Full system prompt changes
-- Changes persist across sessions
+### 🧬 Genome System (v0.5+)
+Forge has a living "genome" that defines its identity:
+
+- **Traits** — Personality characteristics with weights (e.g., "concise" at 90%)
+- **Rules** — Behavioral constraints (must/should/prefer/avoid)
+- **Skills** — Learned capabilities tracked over time
+- **Config** — Model settings, memory limits, evolution preferences
+
+All changes are tracked as **mutations** with semantic versioning.
+
+### 📊 Fitness Tracking
+Every interaction is measured:
+- **Task completion** — Did it successfully help?
+- **User satisfaction** — 👍/👎 feedback from users
+- **Efficiency** — Tokens per successful task
+- **Reliability** — Error rate
+
+Low fitness triggers **evolution proposals** — suggested changes to improve.
+
+### 🔄 Version Control
+- Full mutation history with diffs
+- **Rollback** to any previous version
+- **Fork** genomes to experiment
+- Semantic versioning (major.minor.patch)
 
 ### 🧠 Thinking Stream
 See how Forge reasons through problems:
 - Internal monologue displayed before answers
 - Understand the "why" behind responses
-- Great for learning and debugging
 
 ### 🔧 Live Tool Creation
 Forge can build its own tools:
 - Describe what you need → it writes the code
 - Tools persist and work in future sessions
-- Self-extending capabilities
-
-### 🔒 Security
-- Token-based authentication
-- Rate limiting
-- Input sanitization
-- Security headers
-
-### 🌐 External Tools (v0.5+)
-Forge can now interact with the outside world:
-
-| Tool | Purpose |
-|------|---------|
-| `web_search` | Search the internet (Brave Search API) |
-| `http_fetch` | Make HTTP requests, read web pages |
-| `read_file` | Read files from disk |
-| `write_file` | Write files to disk |
-| `list_files` | List directory contents |
-
-**Web Search Setup:**
-```bash
-# Get free API key at https://brave.com/search/api/
-# Add to .env:
-BRAVE_API_KEY=your_key_here
-```
-
-**Security:**
-- File operations restricted to cwd and /tmp/forge
-- HTTP requests include proper User-Agent
-- Response bodies are size-limited
 
 ### 🐝 Agent Swarm (v0.4+)
-Multiple specialized agents collaborate on complex tasks:
+Multiple specialized agents collaborate:
 
-**Built-in Roles:**
 | Role | Purpose |
 |------|---------|
 | `planner` | Decomposes tasks into subtasks |
-| `researcher` | Gathers information, explores approaches |
+| `researcher` | Gathers information |
 | `coder` | Implements solutions |
 | `critic` | Reviews work, identifies issues |
 | `synthesizer` | Combines outputs into final result |
 
-**Execution Protocols:**
-- `sequential` — Tasks run one after another (A → B → C)
-- `parallel` — Independent tasks run concurrently (A + B + C → merge)
-- `debate` — Propose/critique/refine loop until approved
+### 🌐 External Tools (v0.5+)
+| Tool | Purpose |
+|------|---------|
+| `web_search` | Search the internet (Brave Search) |
+| `http_fetch` | Make HTTP requests |
+| `read_file` | Read files from disk |
+| `write_file` | Write files to disk |
+| `list_files` | List directory contents |
 
-**Example:**
-```typescript
-import { Orchestrator } from '@ryanhelton/forge';
+## API Endpoints
 
-const orchestrator = new Orchestrator({
-  apiKey: process.env.OPENROUTER_API_KEY,
-  defaultModel: 'anthropic/claude-sonnet-4',
-  roles: [], // Use built-in roles
-});
-
-const result = await orchestrator.execute(
-  'Build a REST API for managing todos with validation'
-);
-
-console.log(result.finalOutput);
-console.log(result.blackboard); // Shared findings/artifacts
+### Chat
+```bash
+POST /api/chat
+# Body: { "message": "Hello", "sessionId": "optional-uuid" }
+# Returns: { response, thinking, usage, evolutionProposals? }
 ```
 
-**API Endpoint:**
+### Genome
 ```bash
-curl -X POST http://localhost:3030/api/swarm \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"goal": "Create an email validation function with tests"}'
+GET  /api/genome              # Get full genome
+GET  /api/genome/versions     # Version history
+GET  /api/genome/mutations    # Mutation log
+GET  /api/genome/fitness      # Fitness metrics
+GET  /api/genome/proposals    # Evolution proposals
+
+POST /api/genome/trait        # Add trait: { name, weight?, description? }
+DELETE /api/genome/trait/:id  # Remove trait
+
+POST /api/genome/rule         # Add rule: { description, type?, priority? }
+DELETE /api/genome/rule/:id   # Remove rule
+
+POST /api/genome/feedback     # Record feedback: { feedback: "positive"|"negative" }
+POST /api/genome/rollback     # Rollback: { targetVersion: "1.0.0" }
+POST /api/genome/evolve       # Apply proposal: { type, description }
 ```
 
-## Commands
-
+### Swarm
 ```bash
-forge start     # Start the server
-forge setup     # Configure API key, port, token
-forge config    # Show current configuration
-forge version   # Show version
-forge help      # Show help
+POST /api/swarm               # Run swarm: { goal: "Build a REST API" }
+GET  /api/swarm/roles         # List available roles
+GET  /api/swarm/active        # Check running swarms
+GET  /api/swarm/:runId/status # Swarm status
+```
+
+### Other
+```bash
+GET  /api/health              # Health check + stats
+GET  /api/persona             # Current persona
+GET  /api/tools               # Available tools
+GET  /api/memory              # Stored facts
+GET  /api/runs                # Execution history
 ```
 
 ## Configuration
 
-Config is stored in `~/.forge/`:
+Config stored in `~/.forge/`:
 - `config.json` — API key, port, auth token
-- `data/` — Memory, personas, custom tools
+- `data/` — Memory, personas, custom tools, genome.db
 
 ### Environment Variables
-
 | Variable | Description |
 |----------|-------------|
 | `OPENROUTER_API_KEY` | API key for OpenRouter |
-| `BRAVE_API_KEY` | API key for web search (optional, free tier available) |
+| `BRAVE_API_KEY` | API key for web search (optional) |
 | `PORT` | Server port (default: 3030) |
 | `FORGE_TOKEN` | Auth token for web UI |
 | `DATA_DIR` | Data storage directory |
 
-## How It Works
+## Architecture
 
 ```
-User Input
-    ↓
-Build Context (persona + memory + tools)
-    ↓
-Call LLM (via OpenRouter)
-    ↓
-Parse for Tool Calls
-    ↓
-Execute Tools (if any) → Loop back
-    ↓
-Return Response + Thinking
-    ↓
-Save to Memory
+forge/
+├── bin/forge.js           # CLI entry point
+├── src/
+│   ├── server.ts          # Express server + API routes
+│   ├── agent.ts           # Core agent loop
+│   ├── genome-store.ts    # SQLite genome persistence
+│   ├── genome/            # Genome types, mutations, versioning
+│   ├── llm.ts             # LLM interface
+│   ├── memory.ts          # Persistent memory
+│   ├── tools/             # Built-in tools
+│   └── swarm/             # Multi-agent orchestration
+├── public/                # Web UI
+├── data/                  # Runtime data
+│   ├── genome.db          # SQLite database
+│   └── persona.json       # Active persona
+└── packages/              # Monorepo packages (WIP)
+    ├── core/              # Shared types
+    ├── genome/            # Genome package
+    ├── api/               # API server (planned)
+    └── runtime/           # Agent runtime (planned)
 ```
 
-## Example Interactions
+## Evolution Flow
 
-**Self-evolution:**
 ```
-You: Be more concise from now on
-Forge: Added rule: "Keep responses brief and to the point."
-       I'll follow this going forward.
-```
-
-**Tool creation:**
-```
-You: Create a tool that converts Celsius to Fahrenheit
-Forge: ✅ Tool "celsius_to_fahrenheit" created!
-       Try: "Convert 25°C to Fahrenheit"
-```
-
-**Thinking:**
-```
-You: What's the best sorting algorithm?
-
-🧠 Thinking:
-This depends on context. For general purpose, quicksort 
-is often fastest on average. For nearly-sorted data, 
-insertion sort wins. For stability needs, mergesort...
-
-Forge: It depends on your use case. For general purpose,
-       quicksort (O(n log n) average). For stability, 
-       mergesort. For small/nearly-sorted data, insertion sort.
+Interaction → Track success/tokens/cost
+                    ↓
+            User gives feedback (👍/👎)
+                    ↓
+            Fitness metrics update
+                    ↓
+            If fitness < threshold
+                    ↓
+            Generate proposals
+                    ↓
+            User applies or dismisses
+                    ↓
+            Mutation recorded → Version bumps
+                    ↓
+            Persona syncs
 ```
 
 ## Development
@@ -201,64 +196,17 @@ npm run dev
 
 # Build for production
 npm run build
-```
 
-## Architecture
-
-```
-forge/
-├── bin/forge.js       # CLI entry point
-├── src/
-│   ├── agent.ts       # Core agent loop
-│   ├── llm.ts         # LLM interface
-│   ├── memory.ts      # Persistent memory
-│   ├── security.ts    # Auth & rate limiting
-│   ├── server.ts      # Express server
-│   ├── tools/         # Built-in tools
-│   └── swarm/         # Multi-agent orchestration
-│       ├── types.ts       # SwarmConfig, AgentRole, etc.
-│       ├── roles.ts       # Built-in agent roles
-│       ├── blackboard.ts  # Shared agent workspace
-│       └── orchestrator.ts # Swarm coordinator
-├── public/            # Web UI
-└── package.json
-```
-
-### Swarm Architecture
-
-```
-           ┌─────────────┐
-           │ Orchestrator │
-           └──────┬──────┘
-                  │ decomposes task
-                  ▼
-           ┌─────────────┐
-           │   Planner   │
-           └──────┬──────┘
-                  │ creates plan
-        ┌─────────┼─────────┐
-        ▼         ▼         ▼
-   ┌─────────┐ ┌─────────┐ ┌─────────┐
-   │Researcher│ │  Coder  │ │ Critic  │
-   └────┬────┘ └────┬────┘ └────┬────┘
-        │           │           │
-        └───────────┼───────────┘
-                    ▼
-             ┌─────────────┐
-             │ Blackboard  │  ← shared workspace
-             └──────┬──────┘
-                    ▼
-             ┌─────────────┐
-             │ Synthesizer │
-             └─────────────┘
+# Initialize database
+node scripts/init-db.js
 ```
 
 ## Why "Forge"?
 
-Because we're building tools. And because it sounds cool.
+Because we're building tools. And forging new paths in AI.
 
 ---
 
-**Built for learning. Built for fun.**
+**Built for learning. Built for fun. Built to evolve.**
 
 MIT License • [Ryan Helton](https://github.com/ryanhelton)
