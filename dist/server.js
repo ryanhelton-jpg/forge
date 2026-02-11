@@ -476,7 +476,7 @@ app.get('/api/health', (req, res) => {
     const execStats = executionLog.getStats();
     res.json({
         status: 'ok',
-        version: '0.4.2',
+        version: '0.4.3',
         model: 'anthropic/claude-sonnet-4',
         sessions: sessions.size,
         facts: memory.getFacts().length,
@@ -504,7 +504,7 @@ app.listen(PORT, '0.0.0.0', () => {
     const persona = getPersona();
     const customTools = loadAllCustomTools();
     const execStats = executionLog.getStats();
-    console.log(`\n⚒️  Forge v0.4.2 running at http://localhost:${PORT}`);
+    console.log(`\n⚒️  Forge v0.4.3 running at http://localhost:${PORT}`);
     console.log(`   Features: self-evolution, thinking stream, tool creation, agent swarm, cost tracking`);
     console.log(`   Swarm roles: ${Object.keys(builtInRoles).join(', ')}`);
     console.log(`   Protocols: sequential, parallel, debate`);
