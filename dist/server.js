@@ -31,6 +31,16 @@ if (!OPENROUTER_API_KEY) {
 const memory = new Memory(DATA_DIR);
 const executionLog = new ExecutionLog(DATA_DIR);
 const sessions = new Map();
+const activeSwarms = new Map();
+// Cleanup old swarm tracking (runs that finished > 5 min ago)
+setInterval(() => {
+    const now = Date.now();
+    for (const [runId, swarm] of activeSwarms) {
+        if (swarm.status !== 'running' && now - swarm.startedAt > 300000) {
+            activeSwarms.delete(runId);
+        }
+    }
+}, 60000);
 function buildSystemPrompt() {
     const persona = getPersona();
     const memoryContext = memory.buildContext();
@@ -247,6 +257,29 @@ app.post('/api/swarm', async (req, res) => {
     });
     executionLog.updateRunModel(runId, 'anthropic/claude-sonnet-4');
     const agentsUsed = [];
+    // Initialize swarm tracking for polling
+    const swarmGoal = goal || plan?.goal || 'Unknown goal';
+    const totalTasks = plan?.tasks?.length || 0;
+    activeSwarms.set(runId, {
+        runId,
+        goal: swarmGoal,
+        status: 'running',
+        startedAt: Date.now(),
+        events: [],
+        completedTasks: 0,
+        totalTasks,
+        blackboardEntries: 0,
+    });
+    const addSwarmEvent = (event) => {
+        const swarm = activeSwarms.get(runId);
+        if (swarm) {
+            swarm.events.push({ ...event, timestamp: Date.now() });
+            // Keep only last 100 events
+            if (swarm.events.length > 100) {
+                swarm.events = swarm.events.slice(-100);
+            }
+        }
+    };
     const orchestrator = new Orchestrator({
         apiKey: OPENROUTER_API_KEY,
         defaultModel: 'anthropic/claude-sonnet-4',
@@ -255,15 +288,36 @@ app.post('/api/swarm', async (req, res) => {
         maxTotalTurns: 30,
         onThinking: (roleId, thinking) => {
             console.log(`[${roleId}] thinking...`);
+            addSwarmEvent({ type: 'thinking', roleId, data: { preview: thinking.slice(0, 200) } });
         },
         onAgentStart: (roleId, task) => {
             console.log(`[${roleId}] starting: ${task.description}`);
             if (!agentsUsed.includes(roleId)) {
                 agentsUsed.push(roleId);
             }
+            const swarm = activeSwarms.get(runId);
+            if (swarm) {
+                swarm.currentAgent = roleId;
+                swarm.currentTask = task.description;
+            }
+            addSwarmEvent({ type: 'start', roleId, taskId: task.id, data: { description: task.description } });
         },
         onAgentComplete: (roleId, task) => {
             console.log(`[${roleId}] complete`);
+            const swarm = activeSwarms.get(runId);
+            if (swarm) {
+                swarm.completedTasks++;
+                swarm.currentAgent = undefined;
+                swarm.currentTask = undefined;
+            }
+            addSwarmEvent({ type: 'complete', roleId, taskId: task.id });
+        },
+        onBlackboardUpdate: (entry) => {
+            const swarm = activeSwarms.get(runId);
+            if (swarm) {
+                swarm.blackboardEntries++;
+            }
+            addSwarmEvent({ type: 'blackboard', data: { type: entry.type, author: entry.author, preview: entry.content.slice(0, 100) } });
         },
     });
     try {
@@ -301,11 +355,24 @@ app.post('/api/swarm', async (req, res) => {
         });
         // Complete execution logging
         executionLog.completeRun(runId, { result });
+        // Mark swarm as complete
+        const swarm = activeSwarms.get(runId);
+        if (swarm) {
+            swarm.status = 'complete';
+            swarm.totalTasks = result.tasks?.length || swarm.totalTasks;
+            addSwarmEvent({ type: 'complete', data: { success: result.success } });
+        }
         res.json({ ...result, runId });
     }
     catch (error) {
         console.error('Swarm error:', error);
         executionLog.failRun(runId, error instanceof Error ? error.message : 'Unknown error');
+        // Mark swarm as error
+        const swarm = activeSwarms.get(runId);
+        if (swarm) {
+            swarm.status = 'error';
+            addSwarmEvent({ type: 'error', data: { message: error instanceof Error ? error.message : 'Unknown error' } });
+        }
         res.status(500).json({ error: 'Swarm execution failed' });
     }
 });
@@ -316,6 +383,67 @@ app.get('/api/swarm/roles', (req, res) => {
         name: r.name,
         description: r.description,
     })));
+});
+// List active swarm executions (for polling)
+app.get('/api/swarm/active', (req, res) => {
+    const swarms = Array.from(activeSwarms.values()).map(s => ({
+        runId: s.runId,
+        goal: s.goal,
+        status: s.status,
+        startedAt: s.startedAt,
+        currentAgent: s.currentAgent,
+        currentTask: s.currentTask,
+        completedTasks: s.completedTasks,
+        totalTasks: s.totalTasks,
+        blackboardEntries: s.blackboardEntries,
+        eventCount: s.events.length,
+    }));
+    res.json(swarms);
+});
+// Get swarm status (for polling during execution)
+app.get('/api/swarm/:runId/status', (req, res) => {
+    const swarm = activeSwarms.get(req.params.runId);
+    if (!swarm) {
+        // Check if it's in execution history
+        const run = executionLog.getRun(req.params.runId);
+        if (run && run.type === 'swarm') {
+            return res.json({
+                runId: run.id,
+                status: run.status === 'success' ? 'complete' : run.status,
+                startedAt: run.startedAt,
+                completedAt: run.completedAt,
+                durationMs: run.durationMs,
+                historical: true,
+            });
+        }
+        return res.status(404).json({ error: 'Swarm run not found' });
+    }
+    res.json({
+        runId: swarm.runId,
+        goal: swarm.goal,
+        status: swarm.status,
+        startedAt: swarm.startedAt,
+        elapsedMs: Date.now() - swarm.startedAt,
+        currentAgent: swarm.currentAgent,
+        currentTask: swarm.currentTask,
+        completedTasks: swarm.completedTasks,
+        totalTasks: swarm.totalTasks,
+        blackboardEntries: swarm.blackboardEntries,
+    });
+});
+// Get swarm events (for polling - returns events since lastEventIndex)
+app.get('/api/swarm/:runId/events', (req, res) => {
+    const swarm = activeSwarms.get(req.params.runId);
+    if (!swarm) {
+        return res.status(404).json({ error: 'Swarm run not found' });
+    }
+    const since = parseInt(req.query.since) || 0;
+    const events = swarm.events.slice(since);
+    res.json({
+        events,
+        nextIndex: swarm.events.length,
+        status: swarm.status,
+    });
 });
 // Execution history endpoints
 app.get('/api/runs', (req, res) => {
