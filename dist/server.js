@@ -476,7 +476,7 @@ app.get('/api/health', (req, res) => {
     const execStats = executionLog.getStats();
     res.json({
         status: 'ok',
-        version: '0.4.3',
+        version: '0.4.4',
         model: 'anthropic/claude-sonnet-4',
         sessions: sessions.size,
         facts: memory.getFacts().length,
