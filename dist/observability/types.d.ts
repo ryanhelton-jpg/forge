@@ -9,6 +9,7 @@ export interface UsageStats {
     totalTokens: number;
     estimatedCost: number;
     model: string;
+    source: 'body' | 'headers' | 'estimated';
 }
 /**
  * Individual LLM call record

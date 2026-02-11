@@ -1,7 +1,13 @@
 // LLM interface - OpenRouter with streaming support and usage tracking
 
+import { readFileSync, existsSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import type { Message } from './types.js';
 import type { UsageStats } from './observability/types.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 interface OpenRouterUsage {
   prompt_tokens: number;
@@ -30,47 +36,106 @@ export interface LLMResult {
   durationMs: number;
 }
 
-// Model pricing ($ per 1M tokens) - top models
-// Source: https://openrouter.ai/docs#models
-const MODEL_PRICING: Record<string, { prompt: number; completion: number }> = {
-  'anthropic/claude-sonnet-4': { prompt: 3.0, completion: 15.0 },
-  'anthropic/claude-opus-4': { prompt: 15.0, completion: 75.0 },
-  'anthropic/claude-3.5-sonnet': { prompt: 3.0, completion: 15.0 },
-  'anthropic/claude-3-opus': { prompt: 15.0, completion: 75.0 },
-  'anthropic/claude-3-haiku': { prompt: 0.25, completion: 1.25 },
-  'openai/gpt-4o': { prompt: 2.5, completion: 10.0 },
-  'openai/gpt-4-turbo': { prompt: 10.0, completion: 30.0 },
-  'openai/gpt-3.5-turbo': { prompt: 0.5, completion: 1.5 },
-  'google/gemini-2.0-flash-exp': { prompt: 0.0, completion: 0.0 }, // Free during preview
-  'google/gemini-pro': { prompt: 0.125, completion: 0.375 },
-  'meta-llama/llama-3.1-70b-instruct': { prompt: 0.59, completion: 0.79 },
-  'meta-llama/llama-3.1-405b-instruct': { prompt: 2.7, completion: 2.7 },
-};
+// Pricing data structure
+interface PricingData {
+  lastUpdated: string;
+  models: Record<string, { input: number; output: number }>;
+  fallback: { input: number; output: number };
+}
+
+// Load pricing from file (cached)
+let pricingCache: PricingData | null = null;
+
+function loadPricing(): PricingData {
+  if (pricingCache) return pricingCache;
+  
+  const pricingPath = join(__dirname, 'pricing.json');
+  if (existsSync(pricingPath)) {
+    try {
+      pricingCache = JSON.parse(readFileSync(pricingPath, 'utf-8'));
+      return pricingCache!;
+    } catch (e) {
+      console.warn('Failed to load pricing.json, using defaults');
+    }
+  }
+  
+  // Fallback if file doesn't exist
+  pricingCache = {
+    lastUpdated: 'builtin',
+    models: {
+      'anthropic/claude-sonnet-4': { input: 3.0, output: 15.0 },
+      'openai/gpt-4o': { input: 2.5, output: 10.0 },
+    },
+    fallback: { input: 1.0, output: 3.0 },
+  };
+  return pricingCache;
+}
 
 /**
  * Calculate estimated cost for token usage
  */
 function calculateCost(model: string, promptTokens: number, completionTokens: number): number {
-  const pricing = MODEL_PRICING[model];
-  if (!pricing) {
-    // Default fallback pricing
-    return ((promptTokens * 1.0) + (completionTokens * 3.0)) / 1_000_000;
-  }
-  return ((promptTokens * pricing.prompt) + (completionTokens * pricing.completion)) / 1_000_000;
+  const pricing = loadPricing();
+  const modelPricing = pricing.models[model] || pricing.fallback;
+  return ((promptTokens * modelPricing.input) + (completionTokens * modelPricing.output)) / 1_000_000;
 }
 
 /**
- * Parse usage from OpenRouter response
+ * Parse usage from OpenRouter response headers (fallback)
  */
-function parseUsage(response: OpenRouterResponse, model: string): UsageStats {
-  const usage = response.usage || { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
+function parseUsageFromHeaders(headers: Headers): Partial<OpenRouterUsage> | null {
+  // OpenRouter may include usage in headers for some requests
+  const promptTokens = headers.get('x-prompt-tokens');
+  const completionTokens = headers.get('x-completion-tokens');
   
+  if (promptTokens || completionTokens) {
+    return {
+      prompt_tokens: parseInt(promptTokens || '0', 10),
+      completion_tokens: parseInt(completionTokens || '0', 10),
+      total_tokens: parseInt(promptTokens || '0', 10) + parseInt(completionTokens || '0', 10),
+    };
+  }
+  return null;
+}
+
+/**
+ * Parse usage from OpenRouter response (body first, then headers, then estimate)
+ */
+function parseUsage(response: OpenRouterResponse, headers: Headers, model: string): UsageStats {
+  // Try body first (canonical source)
+  if (response.usage && response.usage.total_tokens > 0) {
+    return {
+      promptTokens: response.usage.prompt_tokens,
+      completionTokens: response.usage.completion_tokens,
+      totalTokens: response.usage.total_tokens,
+      estimatedCost: calculateCost(model, response.usage.prompt_tokens, response.usage.completion_tokens),
+      model,
+      source: 'body',
+    };
+  }
+  
+  // Try headers as fallback
+  const headerUsage = parseUsageFromHeaders(headers);
+  if (headerUsage && headerUsage.total_tokens && headerUsage.total_tokens > 0) {
+    return {
+      promptTokens: headerUsage.prompt_tokens || 0,
+      completionTokens: headerUsage.completion_tokens || 0,
+      totalTokens: headerUsage.total_tokens,
+      estimatedCost: calculateCost(model, headerUsage.prompt_tokens || 0, headerUsage.completion_tokens || 0),
+      model,
+      source: 'headers',
+    };
+  }
+  
+  // Estimate based on response length (rough heuristic: 4 chars ≈ 1 token)
+  const estimatedCompletion = Math.ceil((response.choices[0]?.message?.content?.length || 0) / 4);
   return {
-    promptTokens: usage.prompt_tokens,
-    completionTokens: usage.completion_tokens,
-    totalTokens: usage.total_tokens,
-    estimatedCost: calculateCost(model, usage.prompt_tokens, usage.completion_tokens),
+    promptTokens: 0,
+    completionTokens: estimatedCompletion,
+    totalTokens: estimatedCompletion,
+    estimatedCost: calculateCost(model, 0, estimatedCompletion),
     model,
+    source: 'estimated',
   };
 }
 
@@ -111,7 +176,7 @@ export async function callLLMWithUsage(
 
   const data = (await response.json()) as OpenRouterResponse;
   const content = data.choices[0]?.message?.content || '';
-  const usage = parseUsage(data, model);
+  const usage = parseUsage(data, response.headers, model);
   const durationMs = Date.now() - startTime;
 
   return { content, usage, durationMs };

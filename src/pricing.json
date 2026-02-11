@@ -1,0 +1,27 @@
+{
+  "$schema": "pricing.schema.json",
+  "$comment": "Model pricing in USD per 1M tokens. Run 'forge update-pricing' to refresh.",
+  "lastUpdated": "2025-02-11",
+  "models": {
+    "anthropic/claude-sonnet-4": { "input": 3.0, "output": 15.0 },
+    "anthropic/claude-opus-4": { "input": 15.0, "output": 75.0 },
+    "anthropic/claude-3.5-sonnet": { "input": 3.0, "output": 15.0 },
+    "anthropic/claude-3-opus": { "input": 15.0, "output": 75.0 },
+    "anthropic/claude-3-haiku": { "input": 0.25, "output": 1.25 },
+    "openai/gpt-4o": { "input": 2.5, "output": 10.0 },
+    "openai/gpt-4o-mini": { "input": 0.15, "output": 0.6 },
+    "openai/gpt-4-turbo": { "input": 10.0, "output": 30.0 },
+    "openai/gpt-3.5-turbo": { "input": 0.5, "output": 1.5 },
+    "google/gemini-2.0-flash-exp": { "input": 0.0, "output": 0.0 },
+    "google/gemini-pro": { "input": 0.125, "output": 0.375 },
+    "meta-llama/llama-3.1-70b-instruct": { "input": 0.59, "output": 0.79 },
+    "meta-llama/llama-3.1-405b-instruct": { "input": 2.7, "output": 2.7 },
+    "mistral/mistral-large": { "input": 2.0, "output": 6.0 },
+    "deepseek/deepseek-chat": { "input": 0.14, "output": 0.28 }
+  },
+  "fallback": {
+    "input": 1.0,
+    "output": 3.0,
+    "$comment": "Used for unknown models"
+  }
+}

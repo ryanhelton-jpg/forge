@@ -7,17 +7,23 @@ const EMPTY_USAGE = {
     totalTokens: 0,
     estimatedCost: 0,
     model: 'unknown',
+    source: 'estimated',
 };
 // Aggregate multiple usage stats
 function aggregateUsage(stats) {
     if (stats.length === 0)
         return EMPTY_USAGE;
+    // Determine source: body if any are body, then headers, then estimated
+    const hasBody = stats.some(s => s.source === 'body');
+    const hasHeaders = stats.some(s => s.source === 'headers');
+    const source = hasBody ? 'body' : hasHeaders ? 'headers' : 'estimated';
     return stats.reduce((acc, s) => ({
         promptTokens: acc.promptTokens + s.promptTokens,
         completionTokens: acc.completionTokens + s.completionTokens,
         totalTokens: acc.totalTokens + s.totalTokens,
         estimatedCost: acc.estimatedCost + s.estimatedCost,
         model: s.model, // Use last model
+        source,
     }), { ...EMPTY_USAGE });
 }
 export class Agent {

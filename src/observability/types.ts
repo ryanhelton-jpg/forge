@@ -12,6 +12,7 @@ export interface UsageStats {
   totalTokens: number;
   estimatedCost: number; // USD
   model: string;
+  source: 'body' | 'headers' | 'estimated'; // Where the usage data came from
 }
 
 /**

@@ -19,6 +19,7 @@ const EMPTY_USAGE: UsageStats = {
   totalTokens: 0,
   estimatedCost: 0,
   model: 'unknown',
+  source: 'estimated',
 };
 
 /**

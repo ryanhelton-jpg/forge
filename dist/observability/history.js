@@ -8,6 +8,7 @@ const EMPTY_USAGE = {
     totalTokens: 0,
     estimatedCost: 0,
     model: 'unknown',
+    source: 'estimated',
 };
 /**
  * ExecutionLogger - tracks a single execution and saves to disk
