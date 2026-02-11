@@ -504,7 +504,7 @@ app.listen(PORT, '0.0.0.0', () => {
     const persona = getPersona();
     const customTools = loadAllCustomTools();
     const execStats = executionLog.getStats();
-    console.log(`\n⚒️  Forge v0.4.3 running at http://localhost:${PORT}`);
+    console.log(`\n⚒️  Forge v0.4.4 running at http://localhost:${PORT}`);
     console.log(`   Features: self-evolution, thinking stream, tool creation, agent swarm, cost tracking`);
     console.log(`   Swarm roles: ${Object.keys(builtInRoles).join(', ')}`);
     console.log(`   Protocols: sequential, parallel, debate`);
