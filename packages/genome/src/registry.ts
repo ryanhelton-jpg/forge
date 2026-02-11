@@ -190,6 +190,77 @@ export class GenomeRegistry {
     return rows.map(this.rowToMutation);
   }
 
+  async restore(id: string, targetVersion: string): Promise<AgentGenome> {
+    const genome = await this.get(id);
+    if (!genome) throw new Error('Genome not found');
+
+    // Import versioning utils inline to avoid circular deps
+    const { calculateRestore, reconstructAtVersion } = await import('./versioning.js');
+
+    // Calculate what needs to be rolled back
+    const restoreResult = calculateRestore(genome, targetVersion);
+    if (!restoreResult.success) {
+      throw new Error(restoreResult.error || 'Restore failed');
+    }
+
+    // Reconstruct state at target version
+    const allMutations = await this.history(id, 1000);
+    const restoredState = reconstructAtVersion(genome, allMutations, targetVersion);
+
+    // Bump version (this is a new version representing the restore)
+    const newVersion = semver.inc(genome.version, 'minor') || genome.version;
+
+    // Mark rolled-back mutations
+    for (const mutation of restoreResult.rollbackMutations) {
+      await this.db.update(mutations)
+        .set({ 
+          status: 'rolled_back', 
+          rolledBackAt: new Date() 
+        })
+        .where(eq(mutations.id, mutation.id));
+    }
+
+    // Update genome with restored state
+    await this.db.update(genomes)
+      .set({
+        ...restoredState,
+        version: newVersion,
+        updatedAt: new Date(),
+      })
+      .where(eq(genomes.id, id));
+
+    // Record the restore as a mutation
+    await this.recordMutation(id, newVersion, {
+      type: 'config_change',
+      description: `Restored to v${targetVersion}`,
+      trigger: { source: 'user', reason: 'version restore' },
+      diff: { 
+        path: '/', 
+        before: { version: genome.version }, 
+        after: { version: targetVersion, restored: true } 
+      },
+    });
+
+    return this.get(id) as Promise<AgentGenome>;
+  }
+
+  async getVersions(id: string): Promise<import('./versioning.js').VersionInfo[]> {
+    const genome = await this.get(id);
+    if (!genome) return [];
+
+    const { getVersionHistory } = await import('./versioning.js');
+    const rollbackWindow = genome.config?.evolution?.rollbackWindow ?? 24;
+    return getVersionHistory(genome, rollbackWindow);
+  }
+
+  async diff(id: string, fromVersion: string, toVersion: string): Promise<import('./versioning.js').GenomeDiff> {
+    const genome = await this.get(id);
+    if (!genome) throw new Error('Genome not found');
+
+    const { diffVersions } = await import('./versioning.js');
+    return diffVersions(genome, fromVersion, toVersion);
+  }
+
   // === Private Helpers ===
 
   private async recordMutation(genomeId: string, version: string, mutation: MutationInput) {
