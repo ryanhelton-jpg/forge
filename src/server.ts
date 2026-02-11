@@ -165,8 +165,27 @@ app.post('/api/chat', async (req, res) => {
   executionLog.updateRunModel(runId, 'anthropic/claude-sonnet-4');
 
   try {
-    const { response, thinking } = await agent.chat(cleanMessage);
+    const { response, thinking, usage, toolCalls } = await agent.chat(cleanMessage);
     memory.updateConversation(sid, agent.getHistory());
+    
+    // Update execution log with token usage
+    executionLog.updateRunModel(runId, usage.model, {
+      prompt: usage.promptTokens,
+      completion: usage.completionTokens,
+      total: usage.totalTokens,
+    });
+    
+    // Add tool calls to execution log
+    if (toolCalls) {
+      for (const tc of toolCalls) {
+        executionLog.addToolCall(runId, {
+          name: tc.name,
+          input: tc.params,
+          output: tc.result,
+          durationMs: tc.durationMs,
+        });
+      }
+    }
     
     // Reload custom tools in case new ones were created
     const customTools = loadAllCustomTools();
@@ -179,7 +198,17 @@ app.post('/api/chat', async (req, res) => {
     // Complete execution logging
     executionLog.completeRun(runId, { response, thinking: thinking ?? undefined });
     
-    res.json({ response, thinking, sessionId: sid, runId });
+    res.json({ 
+      response, 
+      thinking, 
+      sessionId: sid, 
+      runId,
+      usage: {
+        tokens: usage.totalTokens,
+        cost: usage.estimatedCost,
+        model: usage.model,
+      },
+    });
   } catch (error) {
     console.error('Chat error:', error);
     executionLog.failRun(runId, error instanceof Error ? error.message : 'Unknown error');
@@ -379,7 +408,7 @@ app.get('/api/health', (req, res) => {
   
   res.json({ 
     status: 'ok', 
-    version: '0.4.1',
+    version: '0.4.2',
     model: 'anthropic/claude-sonnet-4',
     sessions: sessions.size,
     facts: memory.getFacts().length,
@@ -398,6 +427,8 @@ app.get('/api/health', (req, res) => {
       totalRuns: execStats.totalRuns,
       successRate: Math.round(execStats.successRate * 100) + '%',
       avgDurationMs: Math.round(execStats.avgDurationMs),
+      totalTokens: execStats.totalTokens,
+      totalCost: `$${execStats.totalCost.toFixed(4)}`,
     },
   });
 });
@@ -407,13 +438,13 @@ app.listen(PORT, '0.0.0.0', () => {
   const customTools = loadAllCustomTools();
   const execStats = executionLog.getStats();
   
-  console.log(`\n⚒️  Forge v0.4.1 running at http://localhost:${PORT}`);
-  console.log(`   Features: self-evolution, thinking stream, tool creation, agent swarm, execution history`);
+  console.log(`\n⚒️  Forge v0.4.2 running at http://localhost:${PORT}`);
+  console.log(`   Features: self-evolution, thinking stream, tool creation, agent swarm, cost tracking`);
   console.log(`   Swarm roles: ${Object.keys(builtInRoles).join(', ')}`);
   console.log(`   Protocols: sequential, parallel, debate`);
   console.log(`   Persona: v${persona.version} (${persona.traits.join(', ')})`);
   console.log(`   Memory: ${memory.getFacts().length} facts`);
   console.log(`   Custom tools: ${customTools.length}`);
-  console.log(`   Execution history: ${execStats.totalRuns} runs logged`);
+  console.log(`   Execution: ${execStats.totalRuns} runs, ${execStats.totalTokens} tokens, $${execStats.totalCost.toFixed(4)} total`);
   console.log(`   Data: ${DATA_DIR}\n`);
 });

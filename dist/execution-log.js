@@ -3,6 +3,28 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
+// Model pricing ($ per 1M tokens) - synced with llm.ts
+const MODEL_PRICING = {
+    'anthropic/claude-sonnet-4': { prompt: 3.0, completion: 15.0 },
+    'anthropic/claude-opus-4': { prompt: 15.0, completion: 75.0 },
+    'anthropic/claude-3.5-sonnet': { prompt: 3.0, completion: 15.0 },
+    'anthropic/claude-3-opus': { prompt: 15.0, completion: 75.0 },
+    'anthropic/claude-3-haiku': { prompt: 0.25, completion: 1.25 },
+    'openai/gpt-4o': { prompt: 2.5, completion: 10.0 },
+    'openai/gpt-4-turbo': { prompt: 10.0, completion: 30.0 },
+    'openai/gpt-3.5-turbo': { prompt: 0.5, completion: 1.5 },
+    'google/gemini-2.0-flash-exp': { prompt: 0.0, completion: 0.0 },
+    'google/gemini-pro': { prompt: 0.125, completion: 0.375 },
+    'meta-llama/llama-3.1-70b-instruct': { prompt: 0.59, completion: 0.79 },
+    'meta-llama/llama-3.1-405b-instruct': { prompt: 2.7, completion: 2.7 },
+};
+function calculateCost(model, promptTokens, completionTokens) {
+    const pricing = MODEL_PRICING[model];
+    if (!pricing) {
+        return ((promptTokens * 1.0) + (completionTokens * 3.0)) / 1_000_000;
+    }
+    return ((promptTokens * pricing.prompt) + (completionTokens * pricing.completion)) / 1_000_000;
+}
 export class ExecutionLog {
     dataDir;
     logFile;
@@ -53,13 +75,15 @@ export class ExecutionLog {
         this.activeRuns.set(id, run);
         return id;
     }
-    // Update run with model/token info
+    // Update run with model/token info and calculate cost
     updateRunModel(runId, model, tokens) {
         const run = this.activeRuns.get(runId);
         if (run) {
             run.model = model;
             if (tokens) {
                 run.tokens = tokens;
+                // Calculate cost based on model pricing
+                run.cost = calculateCost(model, tokens.prompt || 0, tokens.completion || 0);
             }
         }
     }
@@ -152,6 +176,7 @@ export class ExecutionLog {
             preview: this.getPreview(r),
             model: r.model,
             tokenTotal: r.tokens?.total,
+            cost: r.cost,
         }));
     }
     getPreview(run) {
@@ -175,6 +200,7 @@ export class ExecutionLog {
         const successRuns = runs.filter(r => r.status === 'success').length;
         const durations = runs.filter(r => r.durationMs).map(r => r.durationMs);
         const tokens = runs.filter(r => r.tokens?.total).map(r => r.tokens.total);
+        const costs = runs.filter(r => r.cost !== undefined).map(r => r.cost);
         return {
             totalRuns: runs.length,
             chatRuns,
@@ -182,6 +208,7 @@ export class ExecutionLog {
             successRate: runs.length > 0 ? successRuns / runs.length : 0,
             avgDurationMs: durations.length > 0 ? durations.reduce((a, b) => a + b, 0) / durations.length : 0,
             totalTokens: tokens.reduce((a, b) => a + b, 0),
+            totalCost: costs.reduce((a, b) => a + b, 0),
         };
     }
 }

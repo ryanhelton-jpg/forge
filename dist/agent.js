@@ -1,5 +1,25 @@
-// The Agent - core loop with thinking support
-import { callLLM, parseThinking } from './llm.js';
+// The Agent - core loop with thinking support and usage tracking
+import { callLLMWithUsage, parseThinking } from './llm.js';
+// Empty usage for initialization
+const EMPTY_USAGE = {
+    promptTokens: 0,
+    completionTokens: 0,
+    totalTokens: 0,
+    estimatedCost: 0,
+    model: 'unknown',
+};
+// Aggregate multiple usage stats
+function aggregateUsage(stats) {
+    if (stats.length === 0)
+        return EMPTY_USAGE;
+    return stats.reduce((acc, s) => ({
+        promptTokens: acc.promptTokens + s.promptTokens,
+        completionTokens: acc.completionTokens + s.completionTokens,
+        totalTokens: acc.totalTokens + s.totalTokens,
+        estimatedCost: acc.estimatedCost + s.estimatedCost,
+        model: s.model, // Use last model
+    }), { ...EMPTY_USAGE });
+}
 export class Agent {
     config;
     state;
@@ -83,7 +103,7 @@ export class Agent {
             return `Error executing ${call.name}: ${error}`;
         }
     }
-    // Main chat method with thinking support
+    // Main chat method with thinking support and usage tracking
     async chat(userInput) {
         this.state.messages.push({
             role: 'user',
@@ -91,6 +111,8 @@ export class Agent {
         });
         const maxTurns = this.config.maxTurns || 10;
         let lastThinking = null;
+        const usageStats = [];
+        const toolCallResults = [];
         while (this.state.turnCount < maxTurns) {
             this.state.turnCount++;
             const messagesWithTools = [...this.state.messages];
@@ -100,9 +122,10 @@ export class Agent {
                     content: messagesWithTools[0].content + this.getToolDescriptions(),
                 };
             }
-            const rawResponse = await callLLM(messagesWithTools, this.config.apiKey, this.config.model);
+            const llmResult = await callLLMWithUsage(messagesWithTools, this.config.apiKey, this.config.model);
+            usageStats.push(llmResult.usage);
             // Parse thinking from response
-            const { thinking, response } = parseThinking(rawResponse);
+            const { thinking, response } = parseThinking(llmResult.content);
             if (thinking) {
                 lastThinking = thinking;
                 this.thinkingCallback?.(thinking);
@@ -114,23 +137,41 @@ export class Agent {
                     content: response,
                 });
                 this.state.turnCount = 0;
-                return { response, thinking: lastThinking };
+                return {
+                    response,
+                    thinking: lastThinking,
+                    usage: aggregateUsage(usageStats),
+                    toolCalls: toolCallResults.length > 0 ? toolCallResults : undefined,
+                };
             }
             const toolResults = [];
             for (const call of toolCalls) {
+                const toolStart = Date.now();
                 const result = await this.executeTool(call);
+                const toolDuration = Date.now() - toolStart;
+                toolCallResults.push({
+                    name: call.name,
+                    params: call.params,
+                    result,
+                    durationMs: toolDuration,
+                });
                 toolResults.push(`<tool_result name="${call.name}">\n${result}\n</tool_result>`);
             }
             this.state.messages.push({
                 role: 'assistant',
-                content: rawResponse,
+                content: llmResult.content,
             });
             this.state.messages.push({
                 role: 'user',
                 content: toolResults.join('\n\n'),
             });
         }
-        return { response: 'Max turns reached. Stopping.', thinking: lastThinking };
+        return {
+            response: 'Max turns reached. Stopping.',
+            thinking: lastThinking,
+            usage: aggregateUsage(usageStats),
+            toolCalls: toolCallResults.length > 0 ? toolCallResults : undefined,
+        };
     }
     // Legacy method for backwards compatibility
     async chatSimple(userInput) {

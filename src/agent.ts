@@ -1,10 +1,45 @@
-// The Agent - core loop with thinking support
+// The Agent - core loop with thinking support and usage tracking
 
 import type { Message, AgentConfig, AgentState, Tool, ToolCall } from './types.js';
-import { callLLM, parseThinking } from './llm.js';
+import { callLLMWithUsage, parseThinking, type LLMResult } from './llm.js';
+import type { UsageStats } from './observability/types.js';
 
 export interface ThinkingCallback {
   (thinking: string): void;
+}
+
+export interface ChatResult {
+  response: string;
+  thinking: string | null;
+  usage: UsageStats;
+  toolCalls?: Array<{
+    name: string;
+    params: Record<string, unknown>;
+    result: string;
+    durationMs: number;
+  }>;
+}
+
+// Empty usage for initialization
+const EMPTY_USAGE: UsageStats = {
+  promptTokens: 0,
+  completionTokens: 0,
+  totalTokens: 0,
+  estimatedCost: 0,
+  model: 'unknown',
+};
+
+// Aggregate multiple usage stats
+function aggregateUsage(stats: UsageStats[]): UsageStats {
+  if (stats.length === 0) return EMPTY_USAGE;
+  
+  return stats.reduce((acc, s) => ({
+    promptTokens: acc.promptTokens + s.promptTokens,
+    completionTokens: acc.completionTokens + s.completionTokens,
+    totalTokens: acc.totalTokens + s.totalTokens,
+    estimatedCost: acc.estimatedCost + s.estimatedCost,
+    model: s.model, // Use last model
+  }), { ...EMPTY_USAGE });
 }
 
 export class Agent {
@@ -105,8 +140,8 @@ export class Agent {
     }
   }
 
-  // Main chat method with thinking support
-  async chat(userInput: string): Promise<{ response: string; thinking: string | null }> {
+  // Main chat method with thinking support and usage tracking
+  async chat(userInput: string): Promise<ChatResult> {
     this.state.messages.push({
       role: 'user',
       content: userInput,
@@ -114,6 +149,8 @@ export class Agent {
 
     const maxTurns = this.config.maxTurns || 10;
     let lastThinking: string | null = null;
+    const usageStats: UsageStats[] = [];
+    const toolCallResults: ChatResult['toolCalls'] = [];
 
     while (this.state.turnCount < maxTurns) {
       this.state.turnCount++;
@@ -126,14 +163,16 @@ export class Agent {
         };
       }
 
-      const rawResponse = await callLLM(
+      const llmResult = await callLLMWithUsage(
         messagesWithTools,
         this.config.apiKey,
         this.config.model
       );
+      
+      usageStats.push(llmResult.usage);
 
       // Parse thinking from response
-      const { thinking, response } = parseThinking(rawResponse);
+      const { thinking, response } = parseThinking(llmResult.content);
       
       if (thinking) {
         lastThinking = thinking;
@@ -148,18 +187,33 @@ export class Agent {
           content: response,
         });
         this.state.turnCount = 0;
-        return { response, thinking: lastThinking };
+        return { 
+          response, 
+          thinking: lastThinking,
+          usage: aggregateUsage(usageStats),
+          toolCalls: toolCallResults.length > 0 ? toolCallResults : undefined,
+        };
       }
 
       const toolResults: string[] = [];
       for (const call of toolCalls) {
+        const toolStart = Date.now();
         const result = await this.executeTool(call);
+        const toolDuration = Date.now() - toolStart;
+        
+        toolCallResults.push({
+          name: call.name,
+          params: call.params,
+          result,
+          durationMs: toolDuration,
+        });
+        
         toolResults.push(`<tool_result name="${call.name}">\n${result}\n</tool_result>`);
       }
 
       this.state.messages.push({
         role: 'assistant',
-        content: rawResponse,
+        content: llmResult.content,
       });
       this.state.messages.push({
         role: 'user',
@@ -167,7 +221,12 @@ export class Agent {
       });
     }
 
-    return { response: 'Max turns reached. Stopping.', thinking: lastThinking };
+    return { 
+      response: 'Max turns reached. Stopping.', 
+      thinking: lastThinking,
+      usage: aggregateUsage(usageStats),
+      toolCalls: toolCallResults.length > 0 ? toolCallResults : undefined,
+    };
   }
 
   // Legacy method for backwards compatibility

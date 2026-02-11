@@ -23,6 +23,7 @@ export interface ExecutionRun {
         completion?: number;
         total?: number;
     };
+    cost?: number;
     toolCalls?: Array<{
         name: string;
         input: unknown;
@@ -45,6 +46,7 @@ export interface ExecutionSummary {
     preview: string;
     model?: string;
     tokenTotal?: number;
+    cost?: number;
 }
 export declare class ExecutionLog {
     private dataDir;
@@ -76,5 +78,6 @@ export declare class ExecutionLog {
         successRate: number;
         avgDurationMs: number;
         totalTokens: number;
+        totalCost: number;
     };
 }

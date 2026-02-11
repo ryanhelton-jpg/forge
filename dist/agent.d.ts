@@ -1,6 +1,18 @@
 import type { Message, AgentConfig, Tool } from './types.js';
+import type { UsageStats } from './observability/types.js';
 export interface ThinkingCallback {
     (thinking: string): void;
+}
+export interface ChatResult {
+    response: string;
+    thinking: string | null;
+    usage: UsageStats;
+    toolCalls?: Array<{
+        name: string;
+        params: Record<string, unknown>;
+        result: string;
+        durationMs: number;
+    }>;
 }
 export declare class Agent {
     private config;
@@ -16,10 +28,7 @@ export declare class Agent {
     private getToolDescriptions;
     private parseToolCalls;
     private executeTool;
-    chat(userInput: string): Promise<{
-        response: string;
-        thinking: string | null;
-    }>;
+    chat(userInput: string): Promise<ChatResult>;
     chatSimple(userInput: string): Promise<string>;
     getHistory(): Message[];
     clearHistory(): void;
