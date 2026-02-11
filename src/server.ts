@@ -17,6 +17,7 @@ import { toolCreatorTool, loadAllCustomTools } from './tools/tool-creator.js';
 import { rateLimit, sanitizeInput, securityHeaders, generateToken, tokenAuth } from './security.js';
 import { Orchestrator, builtInRoles } from './swarm/index.js';
 import type { SwarmPlan, SwarmTask, BlackboardEntry } from './swarm/types.js';
+import { ExecutionLog } from './execution-log.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -35,6 +36,7 @@ if (!OPENROUTER_API_KEY) {
 }
 
 const memory = new Memory(DATA_DIR);
+const executionLog = new ExecutionLog(DATA_DIR);
 const sessions = new Map<string, { agent: Agent; lastAccess: Date }>();
 
 function buildSystemPrompt(): string {
@@ -158,6 +160,10 @@ app.post('/api/chat', async (req, res) => {
     memory.createConversation(sid);
   }
 
+  // Start execution logging
+  const runId = executionLog.startRun('chat', { message: cleanMessage }, sid);
+  executionLog.updateRunModel(runId, 'anthropic/claude-sonnet-4');
+
   try {
     const { response, thinking } = await agent.chat(cleanMessage);
     memory.updateConversation(sid, agent.getHistory());
@@ -170,9 +176,13 @@ app.post('/api/chat', async (req, res) => {
       }
     }
     
-    res.json({ response, thinking, sessionId: sid });
+    // Complete execution logging
+    executionLog.completeRun(runId, { response, thinking: thinking ?? undefined });
+    
+    res.json({ response, thinking, sessionId: sid, runId });
   } catch (error) {
     console.error('Chat error:', error);
+    executionLog.failRun(runId, error instanceof Error ? error.message : 'Unknown error');
     res.status(500).json({ error: 'Chat failed. Try again.' });
   }
 });
@@ -248,6 +258,15 @@ app.post('/api/swarm', async (req, res) => {
     return res.status(400).json({ error: 'Goal or plan required' });
   }
 
+  // Start execution logging
+  const runId = executionLog.startRun('swarm', { 
+    goal: goal || plan?.goal, 
+    plan 
+  });
+  executionLog.updateRunModel(runId, 'anthropic/claude-sonnet-4');
+
+  const agentsUsed: string[] = [];
+
   const orchestrator = new Orchestrator({
     apiKey: OPENROUTER_API_KEY!,
     defaultModel: 'anthropic/claude-sonnet-4',
@@ -259,6 +278,9 @@ app.post('/api/swarm', async (req, res) => {
     },
     onAgentStart: (roleId, task) => {
       console.log(`[${roleId}] starting: ${task.description}`);
+      if (!agentsUsed.includes(roleId)) {
+        agentsUsed.push(roleId);
+      }
     },
     onAgentComplete: (roleId, task) => {
       console.log(`[${roleId}] complete`);
@@ -280,16 +302,34 @@ app.post('/api/swarm', async (req, res) => {
           status: 'pending' as const,
         })),
       };
+      
+      executionLog.updateSwarmInfo(runId, {
+        protocol: swarmPlan.protocol,
+        tasksCount: swarmPlan.tasks.length,
+      });
+      
       result = await orchestrator.executePlan(swarmPlan);
       result = { ...result, timing: { startedAt: Date.now(), completedAt: Date.now(), durationMs: 0 } };
     } else {
       // Auto-plan and execute
+      executionLog.updateSwarmInfo(runId, { protocol: 'auto' });
       result = await orchestrator.execute(sanitizeInput(goal));
     }
 
-    res.json(result);
+    // Update swarm info with agents used
+    executionLog.updateSwarmInfo(runId, {
+      protocol: plan?.protocol || protocol || 'auto',
+      tasksCount: result.tasks?.length || 0,
+      agentsUsed,
+    });
+
+    // Complete execution logging
+    executionLog.completeRun(runId, { result });
+
+    res.json({ ...result, runId });
   } catch (error) {
     console.error('Swarm error:', error);
+    executionLog.failRun(runId, error instanceof Error ? error.message : 'Unknown error');
     res.status(500).json({ error: 'Swarm execution failed' });
   }
 });
@@ -303,13 +343,43 @@ app.get('/api/swarm/roles', (req, res) => {
   })));
 });
 
+// Execution history endpoints
+app.get('/api/runs', (req, res) => {
+  const options = {
+    limit: parseInt(req.query.limit as string) || 50,
+    type: req.query.type as 'chat' | 'swarm' | undefined,
+    sessionId: req.query.sessionId as string | undefined,
+    status: req.query.status as 'running' | 'success' | 'error' | undefined,
+    since: req.query.since as string | undefined,
+  };
+  
+  const runs = executionLog.listRuns(options);
+  res.json(runs);
+});
+
+app.get('/api/runs/stats', (req, res) => {
+  const since = req.query.since as string | undefined;
+  const stats = executionLog.getStats(since);
+  res.json(stats);
+});
+
+app.get('/api/runs/:runId', (req, res) => {
+  const run = executionLog.getRun(req.params.runId);
+  if (!run) {
+    return res.status(404).json({ error: 'Run not found' });
+  }
+  res.json(run);
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
   const persona = getPersona();
   const customTools = loadAllCustomTools();
+  const execStats = executionLog.getStats();
+  
   res.json({ 
     status: 'ok', 
-    version: '0.4.0',
+    version: '0.4.1',
     model: 'anthropic/claude-sonnet-4',
     sessions: sessions.size,
     facts: memory.getFacts().length,
@@ -324,19 +394,26 @@ app.get('/api/health', (req, res) => {
       roles: Object.keys(builtInRoles),
       protocols: ['sequential', 'parallel', 'debate'],
     },
+    execution: {
+      totalRuns: execStats.totalRuns,
+      successRate: Math.round(execStats.successRate * 100) + '%',
+      avgDurationMs: Math.round(execStats.avgDurationMs),
+    },
   });
 });
 
 app.listen(PORT, '0.0.0.0', () => {
   const persona = getPersona();
   const customTools = loadAllCustomTools();
+  const execStats = executionLog.getStats();
   
-  console.log(`\n⚒️  Forge v0.4 running at http://localhost:${PORT}`);
-  console.log(`   Features: self-evolution, thinking stream, tool creation, agent swarm`);
+  console.log(`\n⚒️  Forge v0.4.1 running at http://localhost:${PORT}`);
+  console.log(`   Features: self-evolution, thinking stream, tool creation, agent swarm, execution history`);
   console.log(`   Swarm roles: ${Object.keys(builtInRoles).join(', ')}`);
   console.log(`   Protocols: sequential, parallel, debate`);
   console.log(`   Persona: v${persona.version} (${persona.traits.join(', ')})`);
   console.log(`   Memory: ${memory.getFacts().length} facts`);
   console.log(`   Custom tools: ${customTools.length}`);
+  console.log(`   Execution history: ${execStats.totalRuns} runs logged`);
   console.log(`   Data: ${DATA_DIR}\n`);
 });

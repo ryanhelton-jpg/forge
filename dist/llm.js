@@ -1,5 +1,49 @@
-// LLM interface - OpenRouter with streaming support
-export async function callLLM(messages, apiKey, model = 'anthropic/claude-sonnet-4') {
+// LLM interface - OpenRouter with streaming support and usage tracking
+// Model pricing ($ per 1M tokens) - top models
+// Source: https://openrouter.ai/docs#models
+const MODEL_PRICING = {
+    'anthropic/claude-sonnet-4': { prompt: 3.0, completion: 15.0 },
+    'anthropic/claude-opus-4': { prompt: 15.0, completion: 75.0 },
+    'anthropic/claude-3.5-sonnet': { prompt: 3.0, completion: 15.0 },
+    'anthropic/claude-3-opus': { prompt: 15.0, completion: 75.0 },
+    'anthropic/claude-3-haiku': { prompt: 0.25, completion: 1.25 },
+    'openai/gpt-4o': { prompt: 2.5, completion: 10.0 },
+    'openai/gpt-4-turbo': { prompt: 10.0, completion: 30.0 },
+    'openai/gpt-3.5-turbo': { prompt: 0.5, completion: 1.5 },
+    'google/gemini-2.0-flash-exp': { prompt: 0.0, completion: 0.0 }, // Free during preview
+    'google/gemini-pro': { prompt: 0.125, completion: 0.375 },
+    'meta-llama/llama-3.1-70b-instruct': { prompt: 0.59, completion: 0.79 },
+    'meta-llama/llama-3.1-405b-instruct': { prompt: 2.7, completion: 2.7 },
+};
+/**
+ * Calculate estimated cost for token usage
+ */
+function calculateCost(model, promptTokens, completionTokens) {
+    const pricing = MODEL_PRICING[model];
+    if (!pricing) {
+        // Default fallback pricing
+        return ((promptTokens * 1.0) + (completionTokens * 3.0)) / 1_000_000;
+    }
+    return ((promptTokens * pricing.prompt) + (completionTokens * pricing.completion)) / 1_000_000;
+}
+/**
+ * Parse usage from OpenRouter response
+ */
+function parseUsage(response, model) {
+    const usage = response.usage || { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
+    return {
+        promptTokens: usage.prompt_tokens,
+        completionTokens: usage.completion_tokens,
+        totalTokens: usage.total_tokens,
+        estimatedCost: calculateCost(model, usage.prompt_tokens, usage.completion_tokens),
+        model,
+    };
+}
+/**
+ * Call LLM and return content with usage stats
+ */
+export async function callLLMWithUsage(messages, apiKey, model = 'anthropic/claude-sonnet-4') {
+    const startTime = Date.now();
     const formattedMessages = messages.map(m => ({
         role: m.role,
         content: m.content,
@@ -23,7 +67,17 @@ export async function callLLM(messages, apiKey, model = 'anthropic/claude-sonnet
         throw new Error(`LLM call failed: ${response.status} - ${error}`);
     }
     const data = (await response.json());
-    return data.choices[0]?.message?.content || '';
+    const content = data.choices[0]?.message?.content || '';
+    const usage = parseUsage(data, model);
+    const durationMs = Date.now() - startTime;
+    return { content, usage, durationMs };
+}
+/**
+ * Call LLM (legacy - returns content only)
+ */
+export async function callLLM(messages, apiKey, model = 'anthropic/claude-sonnet-4') {
+    const result = await callLLMWithUsage(messages, apiKey, model);
+    return result.content;
 }
 // Streaming version for thinking display
 export async function callLLMStream(messages, apiKey, model = 'anthropic/claude-sonnet-4', callbacks = {}) {
