@@ -7,7 +7,7 @@
  */
 
 // Types
-export * from './types';
+export * from './types.js';
 
 // Mutations
 export {
@@ -29,7 +29,7 @@ export {
   requiresConsent,
   isWithinRollbackWindow,
   MutationUtils,
-} from './mutations';
+} from './mutations.js';
 
 // Versioning
 export {
@@ -48,8 +48,8 @@ export {
   diffGenomes,
   mergeCapabilities,
   VersioningUtils,
-} from './versioning';
+} from './versioning.js';
 
 // Re-export default utilities
-export { default as Mutations } from './mutations';
-export { default as Versioning } from './versioning';
+export { default as Mutations } from './mutations.js';
+export { default as Versioning } from './versioning.js';

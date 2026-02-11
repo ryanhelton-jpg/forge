@@ -1,7 +1,79 @@
-import { CreateGenomeInput, AgentGenome, MutationInput, ForkOptions, Mutation, Identity, ToolRef, SkillRef, KnowledgeRef, AgentConfig, GenomeFitness } from '@forge/core';
+import { Mutation, AgentGenome, CreateGenomeInput, MutationInput, ForkOptions, Identity, ToolRef, SkillRef, KnowledgeRef, AgentConfig, GenomeFitness, MutationType } from '@forge/core';
 import * as drizzle_orm_better_sqlite3 from 'drizzle-orm/better-sqlite3';
 import Database from 'better-sqlite3';
 import * as drizzle_orm_sqlite_core from 'drizzle-orm/sqlite-core';
+
+/**
+ * Versioning Utilities
+ *
+ * Restore, diff, and version history for Agent Genomes.
+ */
+
+interface VersionInfo {
+    version: string;
+    timestamp: Date;
+    description: string;
+    mutationType: Mutation['type'];
+    trigger: Mutation['trigger']['source'];
+    canRollback: boolean;
+}
+interface GenomeDiff {
+    fromVersion: string;
+    toVersion: string;
+    changes: DiffEntry[];
+    summary: string;
+    stats: {
+        added: number;
+        removed: number;
+        modified: number;
+    };
+}
+interface DiffEntry {
+    path: string;
+    type: 'added' | 'removed' | 'modified';
+    description: string;
+    before?: unknown;
+    after?: unknown;
+}
+interface RestoreResult {
+    success: boolean;
+    version: string;
+    rollbackMutations: Mutation[];
+    error?: string;
+}
+/**
+ * Get chronological version history for a genome
+ */
+declare function getVersionHistory(genome: AgentGenome, rollbackWindowHours?: number): VersionInfo[];
+/**
+ * Get the previous version before a given version
+ */
+declare function getPreviousVersion(genome: AgentGenome, currentVersion: string): string | null;
+/**
+ * Calculate what mutations need to be rolled back to restore to a version
+ */
+declare function calculateRestore(genome: AgentGenome, targetVersion: string): RestoreResult;
+/**
+ * Reconstruct genome state at a specific version
+ * Returns the fields that should be updated
+ */
+declare function reconstructAtVersion(genome: AgentGenome, mutations: Mutation[], targetVersion: string): Partial<AgentGenome>;
+/**
+ * Generate diff between two versions of a genome
+ */
+declare function diffVersions(genome: AgentGenome, fromVersion: string, toVersion: string): GenomeDiff;
+/**
+ * Compare two different genomes (e.g., parent and fork)
+ */
+declare function diffGenomes(genome1: AgentGenome, genome2: AgentGenome): GenomeDiff;
+declare const VersioningUtils: {
+    getHistory: typeof getVersionHistory;
+    getPreviousVersion: typeof getPreviousVersion;
+    calculateRestore: typeof calculateRestore;
+    reconstructAtVersion: typeof reconstructAtVersion;
+    diffVersions: typeof diffVersions;
+    diffGenomes: typeof diffGenomes;
+};
 
 declare class GenomeRegistry {
     private get db();
@@ -13,6 +85,9 @@ declare class GenomeRegistry {
     delete(id: string): Promise<void>;
     fork(id: string, userId: string, options?: ForkOptions): Promise<AgentGenome>;
     history(id: string, limit?: number): Promise<Mutation[]>;
+    restore(id: string, targetVersion: string): Promise<AgentGenome>;
+    getVersions(id: string): Promise<VersionInfo[]>;
+    diff(id: string, fromVersion: string, toVersion: string): Promise<GenomeDiff>;
     private recordMutation;
     private applyDiff;
     private bumpVersion;
@@ -658,4 +733,47 @@ declare function getDb(): drizzle_orm_better_sqlite3.BetterSQLite3Database<Recor
     $client: Database.Database;
 };
 
-export { GenomeRegistry, type GenomeRow, type MutationRow, type NewGenomeRow, type NewMutationRow, genomes, getDb, mutations, schema };
+/**
+ * Enhanced Mutation Utilities
+ *
+ * Validation, consent checks, rollback windows, and mutation helpers.
+ */
+
+type ConsentLevel = 'none' | 'major' | 'all';
+/**
+ * Check if a mutation requires user consent before applying
+ */
+declare function requiresConsent(mutationType: MutationType, trigger: Mutation['trigger'], consentLevel: ConsentLevel): boolean;
+/**
+ * Check if a mutation can still be rolled back
+ */
+declare function isWithinRollbackWindow(mutation: Mutation, windowHours: number): boolean;
+interface ValidationResult {
+    valid: boolean;
+    errors: string[];
+    warnings: string[];
+}
+/**
+ * Validate a mutation before applying
+ */
+declare function validateMutation(mutation: MutationInput, currentGenome: AgentGenome): ValidationResult;
+/**
+ * Generate human-readable description for a mutation
+ */
+declare function describeMutation(type: MutationType, diff: Mutation['diff']): string;
+/**
+ * Calculate fitness change from interaction feedback
+ */
+declare function calculateFitnessChange(currentFitness: number, feedback: 'positive' | 'negative' | 'neutral', weight?: number): {
+    before: number;
+    after: number;
+};
+declare const MutationUtils: {
+    requiresConsent: typeof requiresConsent;
+    isWithinRollbackWindow: typeof isWithinRollbackWindow;
+    validate: typeof validateMutation;
+    describe: typeof describeMutation;
+    calculateFitnessChange: typeof calculateFitnessChange;
+};
+
+export { type ConsentLevel, type DiffEntry, type GenomeDiff, GenomeRegistry, type GenomeRow, type MutationRow, MutationUtils, type NewGenomeRow, type NewMutationRow, type RestoreResult, type ValidationResult, type VersionInfo, VersioningUtils, calculateFitnessChange, calculateRestore, describeMutation, diffGenomes, diffVersions, genomes, getDb, getPreviousVersion, getVersionHistory, isWithinRollbackWindow, mutations, reconstructAtVersion, requiresConsent, schema, validateMutation };

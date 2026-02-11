@@ -46,13 +46,7 @@ export declare function createMutation(genomeId: string, version: string, input:
 export declare function bumpVersion(current: string, mutationType: MutationType): string;
 export declare function createDiff(path: string, before: any, after: any): MutationDiff;
 export declare function describeMutation(type: MutationType, diff: MutationDiff): string;
-/**
- * Apply a mutation to a genome object (pure function, returns new object)
- */
 export declare function applyMutationToGenome<T extends object>(genome: T, diff: MutationDiff): T;
-/**
- * Reverse a mutation (for rollback)
- */
 export declare function reverseMutation<T extends object>(genome: T, diff: MutationDiff): T;
 export interface ValidationResult {
     valid: boolean;

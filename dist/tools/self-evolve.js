@@ -34,6 +34,10 @@ function savePersona(config) {
 export function getPersona() {
     return loadPersona();
 }
+// Set persona from genome sync
+export function setPersona(config) {
+    savePersona(config);
+}
 export const selfEvolveTool = {
     name: 'evolve',
     description: `Modify your own behavior, personality, or rules. Use this to:

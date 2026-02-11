@@ -7,7 +7,7 @@
 
 import { createId } from '@paralleldrive/cuid2';
 import * as semver from 'semver';
-import type { Mutation, MutationDiff } from './mutations';
+import type { Mutation, MutationDiff } from './mutations.js';
 
 // === Types ===
 

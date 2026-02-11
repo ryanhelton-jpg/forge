@@ -7,4 +7,5 @@ export interface PersonaConfig {
     version: number;
 }
 export declare function getPersona(): PersonaConfig;
+export declare function setPersona(config: PersonaConfig): void;
 export declare const selfEvolveTool: Tool;

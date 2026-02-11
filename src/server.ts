@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Forge Web Server v0.3 - Self-evolving agent with thinking stream
+// Forge Web Server v0.5 - Self-evolving agent with thinking stream
 
 import 'dotenv/config';
 import express from 'express';
@@ -574,6 +574,402 @@ app.get('/api/runs/:runId', (req, res) => {
   res.json(run);
 });
 
+// === Genome API (v0.5.0) ===
+import { 
+  AgentGenome, 
+  Trait, 
+  Rule, 
+  ToolRef,
+  MutationUtils 
+} from './genome/index.js';
+import { getGenomeStore } from './genome-store.js';
+
+// Initialize default genome from current persona if not exists
+function getOrCreateDefaultGenome(): AgentGenome {
+  const store = getGenomeStore();
+  let genome = store.getDefault();
+  
+  if (!genome) {
+    const persona = getPersona();
+    genome = {
+      id: 'default',
+      userId: 'local',
+      name: 'Forge',
+      slug: 'forge',
+      version: '1.0.0',
+      lineage: [],
+      identity: {
+        purpose: persona.systemPrompt,
+        personality: persona.traits.map((t, i) => ({
+          id: `trait-${i}`,
+          name: t,
+          weight: 1.0,
+          source: 'seed' as const,
+          addedAt: new Date(),
+        })),
+        constraints: persona.rules.map((r, i) => ({
+          id: `rule-${i}`,
+          description: r,
+          type: 'must' as const,
+          priority: 5,
+          source: 'seed' as const,
+          addedAt: new Date(),
+        })),
+      },
+      tools: [],
+      skills: [],
+      knowledge: [],
+      config: {
+        model: {
+          provider: 'openrouter',
+          model: 'anthropic/claude-sonnet-4',
+          temperature: 0.7,
+          maxTokens: 4096,
+        },
+        memory: {
+          conversationLimit: 50,
+          factRetention: 'relevant',
+          summarizationThreshold: 10000,
+          semanticSearch: false,
+        },
+        evolution: {
+          enabled: true,
+          autoPropose: true,
+          autoApply: false,
+          consentThreshold: 'major',
+          rollbackWindow: 24,
+          minConfidence: 0.7,
+        },
+      },
+      status: 'active',
+      visibility: 'private',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      stats: {
+        totalInteractions: 0,
+        totalTokens: 0,
+        totalCost: 0,
+      },
+    };
+    genome = store.create(genome);
+  }
+  
+  return genome;
+}
+
+// Sync genome traits to persona file
+function syncGenomeToPersona(genome: AgentGenome): void {
+  const currentPersona = getPersona();
+  
+  // Dynamically import setPersona to avoid circular deps
+  import('./tools/self-evolve.js').then(({ setPersona }) => {
+    setPersona({
+      ...currentPersona,
+      traits: genome.identity.personality.map(t => t.name),
+      rules: genome.identity.constraints.map(r => r.description),
+      updatedAt: new Date().toISOString(),
+      version: currentPersona.version + 1,
+    });
+  });
+}
+
+// GET /api/genome - Get current genome
+app.get('/api/genome', (req, res) => {
+  try {
+    const genome = getOrCreateDefaultGenome();
+    res.json(genome);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// GET /api/genome/versions - Get version history
+app.get('/api/genome/versions', (req, res) => {
+  try {
+    const store = getGenomeStore();
+    const genome = getOrCreateDefaultGenome();
+    const versions = store.getVersionHistory(genome.id);
+    res.json({
+      current: genome.version,
+      versions: versions.length > 0 ? versions : [{ version: genome.version, timestamp: Date.now(), description: 'Current' }],
+    });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// GET /api/genome/mutations - Get mutation history
+app.get('/api/genome/mutations', (req, res) => {
+  try {
+    const store = getGenomeStore();
+    const genome = getOrCreateDefaultGenome();
+    const mutations = store.getMutations(genome.id, 50);
+    res.json(mutations.map(m => ({
+      ...m,
+      trigger: JSON.parse(m.trigger),
+      diff: JSON.parse(m.diff),
+    })));
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// POST /api/genome/trait - Add a trait
+app.post('/api/genome/trait', (req, res) => {
+  try {
+    const { name, weight = 1.0, description } = req.body;
+    
+    if (!name) {
+      return res.status(400).json({ error: 'name required' });
+    }
+    
+    const store = getGenomeStore();
+    const genome = getOrCreateDefaultGenome();
+    
+    const trait: Trait = {
+      id: `trait-${Date.now()}`,
+      name,
+      weight,
+      source: 'evolved',
+      description,
+      addedAt: new Date(),
+    };
+    
+    const updated = store.addTrait(genome.id, trait);
+    syncGenomeToPersona(updated);
+    
+    res.json({ success: true, trait, genome: updated });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// DELETE /api/genome/trait/:id - Remove a trait
+app.delete('/api/genome/trait/:id', (req, res) => {
+  try {
+    const store = getGenomeStore();
+    const genome = getOrCreateDefaultGenome();
+    
+    const updated = store.removeTrait(genome.id, req.params.id);
+    syncGenomeToPersona(updated);
+    
+    res.json({ success: true, genome: updated });
+  } catch (error) {
+    if ((error as Error).message === 'Trait not found') {
+      return res.status(404).json({ error: 'Trait not found' });
+    }
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// POST /api/genome/rule - Add a rule
+app.post('/api/genome/rule', (req, res) => {
+  try {
+    const { description, type = 'should', priority = 5 } = req.body;
+    
+    if (!description) {
+      return res.status(400).json({ error: 'description required' });
+    }
+    
+    const store = getGenomeStore();
+    const genome = getOrCreateDefaultGenome();
+    
+    const rule: Rule = {
+      id: `rule-${Date.now()}`,
+      description,
+      type: type as 'must' | 'should' | 'prefer' | 'avoid',
+      priority,
+      source: 'evolved',
+      addedAt: new Date(),
+    };
+    
+    const updated = store.addRule(genome.id, rule);
+    syncGenomeToPersona(updated);
+    
+    res.json({ success: true, rule, genome: updated });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// DELETE /api/genome/rule/:id - Remove a rule
+app.delete('/api/genome/rule/:id', (req, res) => {
+  try {
+    const store = getGenomeStore();
+    const genome = getOrCreateDefaultGenome();
+    
+    const updated = store.removeRule(genome.id, req.params.id);
+    syncGenomeToPersona(updated);
+    
+    res.json({ success: true, genome: updated });
+  } catch (error) {
+    if ((error as Error).message === 'Rule not found') {
+      return res.status(404).json({ error: 'Rule not found' });
+    }
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// POST /api/genome/rollback - Rollback to a previous version
+app.post('/api/genome/rollback', (req, res) => {
+  try {
+    const { targetVersion } = req.body;
+    
+    if (!targetVersion) {
+      return res.status(400).json({ error: 'targetVersion required' });
+    }
+    
+    const store = getGenomeStore();
+    const genome = getOrCreateDefaultGenome();
+    
+    const updated = store.rollback(genome.id, targetVersion);
+    syncGenomeToPersona(updated);
+    
+    res.json({ 
+      success: true, 
+      message: `Rolled back to v${targetVersion}`,
+      genome: updated 
+    });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// POST /api/genome/feedback - Record interaction feedback for fitness
+app.post('/api/genome/feedback', (req, res) => {
+  try {
+    const { feedback, tokens = 0, cost = 0, success = true } = req.body;
+    
+    if (!feedback || !['positive', 'negative', 'neutral'].includes(feedback)) {
+      return res.status(400).json({ error: 'feedback must be positive, negative, or neutral' });
+    }
+    
+    const store = getGenomeStore();
+    const genome = getOrCreateDefaultGenome();
+    
+    store.recordInteraction(genome.id, {
+      success,
+      tokens,
+      cost,
+      userFeedback: feedback,
+    });
+    
+    const updated = store.get(genome.id);
+    
+    res.json({ 
+      success: true, 
+      fitness: updated?.fitness,
+      stats: updated?.stats,
+    });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// GET /api/genome/fitness - Get current fitness metrics
+app.get('/api/genome/fitness', (req, res) => {
+  try {
+    const genome = getOrCreateDefaultGenome();
+    
+    res.json({
+      fitness: genome.fitness || {
+        overall: 0.5,
+        metrics: {
+          taskCompletion: 0.5,
+          userSatisfaction: 0.5,
+          efficiency: 0.5,
+          reliability: 0.5,
+        },
+        sampleSize: 0,
+        lastEvaluated: null,
+      },
+      stats: genome.stats,
+    });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// GET /api/genome/proposals - Get evolution proposals based on feedback
+app.get('/api/genome/proposals', (req, res) => {
+  try {
+    const store = getGenomeStore();
+    const genome = getOrCreateDefaultGenome();
+    
+    // In a real implementation, this would pull from recent conversation history
+    // For now, return based on fitness thresholds
+    const proposals = store.proposeEvolution(genome.id, {
+      recentFeedback: [],
+      recentTopics: [],
+    });
+    
+    res.json({ proposals });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// POST /api/genome/evolve - Apply an evolution proposal
+app.post('/api/genome/evolve', (req, res) => {
+  try {
+    const { type, description, reason } = req.body;
+    
+    if (!type || !description) {
+      return res.status(400).json({ error: 'type and description required' });
+    }
+    
+    const store = getGenomeStore();
+    const genome = getOrCreateDefaultGenome();
+    
+    let updated: typeof genome;
+    
+    if (type === 'trait_add') {
+      updated = store.addTrait(genome.id, {
+        id: `trait-${Date.now()}`,
+        name: description,
+        weight: 0.8, // Evolved traits start slightly lower
+        source: 'evolved',
+        description: reason,
+        addedAt: new Date(),
+      });
+    } else if (type === 'rule_add') {
+      updated = store.addRule(genome.id, {
+        id: `rule-${Date.now()}`,
+        description,
+        type: 'should',
+        priority: 5,
+        source: 'evolved',
+        addedAt: new Date(),
+      });
+    } else {
+      return res.status(400).json({ error: 'Unsupported evolution type' });
+    }
+    
+    syncGenomeToPersona(updated);
+    
+    res.json({ 
+      success: true, 
+      message: `Evolution applied: ${description}`,
+      genome: updated 
+    });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// Helper: get nested value by path
+function getNestedValue(obj: any, path: string): any {
+  return path.split('.').reduce((o, k) => o?.[k], obj);
+}
+
+// Helper: set nested value by path
+function setNestedValue(obj: any, path: string, value: any): void {
+  const parts = path.split('.');
+  const last = parts.pop()!;
+  const target = parts.reduce((o, k) => o[k] = o[k] || {}, obj);
+  target[last] = value;
+}
+
 // Health check
 app.get('/api/health', (req, res) => {
   const persona = getPersona();
@@ -582,7 +978,7 @@ app.get('/api/health', (req, res) => {
   
   res.json({ 
     status: 'ok', 
-    version: '0.4.4',
+    version: '0.5.0',
     model: 'anthropic/claude-sonnet-4',
     sessions: sessions.size,
     facts: memory.getFacts().length,
@@ -612,7 +1008,7 @@ app.listen(PORT, '0.0.0.0', () => {
   const customTools = loadAllCustomTools();
   const execStats = executionLog.getStats();
   
-  console.log(`\n⚒️  Forge v0.4.4 running at http://localhost:${PORT}`);
+  console.log(`\n⚒️  Forge v0.5.0 running at http://localhost:${PORT}`);
   console.log(`   Features: self-evolution, thinking stream, tool creation, agent swarm, cost tracking`);
   console.log(`   Swarm roles: ${Object.keys(builtInRoles).join(', ')}`);
   console.log(`   Protocols: sequential, parallel, debate`);

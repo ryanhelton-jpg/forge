@@ -1,8 +1,13 @@
-var __defProp = Object.defineProperty;
-var __export = (target, all) => {
-  for (var name in all)
-    __defProp(target, name, { get: all[name], enumerable: true });
-};
+import {
+  VersioningUtils,
+  __export,
+  calculateRestore,
+  diffGenomes,
+  diffVersions,
+  getPreviousVersion,
+  getVersionHistory,
+  reconstructAtVersion
+} from "./chunk-QGGEI2F2.js";
 
 // src/registry.ts
 import { eq, desc, and } from "drizzle-orm";
@@ -190,6 +195,53 @@ var GenomeRegistry = class {
     const rows = await this.db.select().from(mutations2).where(eq(mutations2.genomeId, id)).orderBy(desc(mutations2.timestamp)).limit(limit);
     return rows.map(this.rowToMutation);
   }
+  async restore(id, targetVersion) {
+    const genome = await this.get(id);
+    if (!genome) throw new Error("Genome not found");
+    const { calculateRestore: calculateRestore2, reconstructAtVersion: reconstructAtVersion2 } = await import("./versioning-XXPNXZDA.js");
+    const restoreResult = calculateRestore2(genome, targetVersion);
+    if (!restoreResult.success) {
+      throw new Error(restoreResult.error || "Restore failed");
+    }
+    const allMutations = await this.history(id, 1e3);
+    const restoredState = reconstructAtVersion2(genome, allMutations, targetVersion);
+    const newVersion = semver.inc(genome.version, "minor") || genome.version;
+    for (const mutation of restoreResult.rollbackMutations) {
+      await this.db.update(mutations2).set({
+        status: "rolled_back",
+        rolledBackAt: /* @__PURE__ */ new Date()
+      }).where(eq(mutations2.id, mutation.id));
+    }
+    await this.db.update(genomes2).set({
+      ...restoredState,
+      version: newVersion,
+      updatedAt: /* @__PURE__ */ new Date()
+    }).where(eq(genomes2.id, id));
+    await this.recordMutation(id, newVersion, {
+      type: "config_change",
+      description: `Restored to v${targetVersion}`,
+      trigger: { source: "user", reason: "version restore" },
+      diff: {
+        path: "/",
+        before: { version: genome.version },
+        after: { version: targetVersion, restored: true }
+      }
+    });
+    return this.get(id);
+  }
+  async getVersions(id) {
+    const genome = await this.get(id);
+    if (!genome) return [];
+    const { getVersionHistory: getVersionHistory2 } = await import("./versioning-XXPNXZDA.js");
+    const rollbackWindow = genome.config?.evolution?.rollbackWindow ?? 24;
+    return getVersionHistory2(genome, rollbackWindow);
+  }
+  async diff(id, fromVersion, toVersion) {
+    const genome = await this.get(id);
+    if (!genome) throw new Error("Genome not found");
+    const { diffVersions: diffVersions2 } = await import("./versioning-XXPNXZDA.js");
+    return diffVersions2(genome, fromVersion, toVersion);
+  }
   // === Private Helpers ===
   async recordMutation(genomeId, version, mutation) {
     await this.db.insert(mutations2).values({
@@ -304,10 +356,215 @@ var GenomeRegistry = class {
     };
   }
 };
+
+// src/mutations.ts
+function requiresConsent(mutationType, trigger, consentLevel) {
+  if (trigger.source === "user") return false;
+  if (trigger.source === "system") return false;
+  if (consentLevel === "none") return false;
+  if (consentLevel === "all") return true;
+  const majorChanges = [
+    "identity_update",
+    "tool_add",
+    "tool_remove",
+    "rule_add",
+    "rule_remove",
+    "trait_add",
+    "trait_remove"
+  ];
+  return majorChanges.includes(mutationType);
+}
+function isWithinRollbackWindow(mutation, windowHours) {
+  if (!mutation.appliedAt || mutation.status !== "applied") return false;
+  const windowMs = windowHours * 60 * 60 * 1e3;
+  const appliedTime = mutation.appliedAt instanceof Date ? mutation.appliedAt.getTime() : new Date(mutation.appliedAt).getTime();
+  return Date.now() - appliedTime < windowMs;
+}
+function validateMutation(mutation, currentGenome) {
+  const errors = [];
+  const warnings = [];
+  const validTypes = [
+    "trait_add",
+    "trait_remove",
+    "trait_adjust",
+    "rule_add",
+    "rule_remove",
+    "rule_modify",
+    "tool_add",
+    "tool_remove",
+    "tool_config",
+    "skill_add",
+    "skill_improve",
+    "skill_decay",
+    "config_change",
+    "identity_update"
+  ];
+  if (!validTypes.includes(mutation.type)) {
+    errors.push(`Invalid mutation type: ${mutation.type}`);
+  }
+  if (mutation.type.startsWith("trait_")) {
+    validateTraitMutation(mutation, errors, warnings);
+  }
+  if (mutation.type.startsWith("rule_")) {
+    validateRuleMutation(mutation, errors, warnings);
+  }
+  if (mutation.type.startsWith("tool_")) {
+    validateToolMutation(mutation, currentGenome, errors, warnings);
+  }
+  if (!mutation.trigger?.source) {
+    errors.push("Mutation trigger source is required");
+  }
+  if (!mutation.diff) {
+    errors.push("Mutation diff is required");
+  }
+  return {
+    valid: errors.length === 0,
+    errors,
+    warnings
+  };
+}
+function getProp(obj, key) {
+  if (obj && typeof obj === "object" && key in obj) {
+    return obj[key];
+  }
+  return void 0;
+}
+function validateTraitMutation(mutation, errors, warnings) {
+  const { diff, type } = mutation;
+  const afterName = getProp(diff.after, "name");
+  const afterWeight = getProp(diff.after, "weight");
+  if (type !== "trait_remove" && !afterName) {
+    errors.push("Trait mutations require a name");
+  }
+  if (afterWeight !== void 0) {
+    if (typeof afterWeight !== "number") {
+      errors.push("Trait weight must be a number");
+    } else if (afterWeight < 0 || afterWeight > 1) {
+      errors.push("Trait weight must be between 0 and 1");
+    }
+  }
+  if (type === "trait_adjust" && !diff.before) {
+    warnings.push("trait_adjust without before value - cannot verify change");
+  }
+}
+function validateRuleMutation(mutation, errors, warnings) {
+  const { diff, type } = mutation;
+  const afterDesc = getProp(diff.after, "description");
+  const afterType = getProp(diff.after, "type");
+  const afterPriority = getProp(diff.after, "priority");
+  if (type !== "rule_remove" && !afterDesc) {
+    errors.push("Rule mutations require a description");
+  }
+  if (afterType) {
+    const validRuleTypes = ["must", "should", "prefer", "avoid"];
+    if (!validRuleTypes.includes(String(afterType))) {
+      errors.push(`Invalid rule type: ${afterType}`);
+    }
+  }
+  if (afterPriority !== void 0) {
+    if (typeof afterPriority !== "number" || afterPriority < 1 || afterPriority > 10) {
+      warnings.push("Rule priority should be between 1 and 10");
+    }
+  }
+}
+function validateToolMutation(mutation, genome, errors, warnings) {
+  const { diff, type } = mutation;
+  const afterId = getProp(diff.after, "id");
+  const afterName = getProp(diff.after, "name");
+  const beforeId = getProp(diff.before, "id");
+  if (type === "tool_add") {
+    if (!afterId && !afterName) {
+      errors.push("Tool add requires tool id or name");
+    }
+    if (afterId && genome.tools.some((t) => t.id === afterId)) {
+      warnings.push(`Tool ${afterId} already exists - will update instead of add`);
+    }
+  }
+  if (type === "tool_remove") {
+    if (beforeId && !genome.tools.some((t) => t.id === beforeId)) {
+      errors.push(`Tool ${beforeId} not found in genome`);
+    }
+  }
+}
+function describeMutation(type, diff) {
+  const get = (obj, key) => {
+    if (obj && typeof obj === "object" && key in obj) {
+      return obj[key];
+    }
+    return void 0;
+  };
+  const getName = (obj) => String(get(obj, "name") || get(obj, "id") || "unknown");
+  const getDesc = (obj) => String(get(obj, "description") || "unknown");
+  const getWeight = (obj) => {
+    const w = get(obj, "weight");
+    return typeof w === "number" ? w.toFixed(2) : "?";
+  };
+  const getConfidence = (obj) => {
+    const c = get(obj, "confidence");
+    return typeof c === "number" ? (c * 100).toFixed(0) + "%" : "?";
+  };
+  const descriptions = {
+    trait_add: () => `Added trait: ${getName(diff.after)}`,
+    trait_remove: () => `Removed trait: ${getName(diff.before)}`,
+    trait_adjust: () => `Adjusted "${getName(diff.before)}": ${getWeight(diff.before)} \u2192 ${getWeight(diff.after)}`,
+    rule_add: () => `Added rule: "${truncate(getDesc(diff.after), 50)}"`,
+    rule_remove: () => `Removed rule: "${truncate(getDesc(diff.before), 50)}"`,
+    rule_modify: () => `Modified rule: "${truncate(getDesc(diff.before), 50)}"`,
+    tool_add: () => `Installed tool: ${getName(diff.after)}`,
+    tool_remove: () => `Removed tool: ${getName(diff.before)}`,
+    tool_config: () => `Updated tool config: ${getName(diff.before)}`,
+    skill_add: () => `Learned skill: ${getName(diff.after)}`,
+    skill_improve: () => `Improved "${getName(diff.before)}": ${getConfidence(diff.before)} \u2192 ${getConfidence(diff.after)}`,
+    skill_decay: () => `Skill decay: "${getName(diff.before)}" (unused)`,
+    config_change: () => `Configuration changed: ${diff.path}`,
+    identity_update: () => `Identity updated`
+  };
+  return descriptions[type]?.() || `Mutation: ${type}`;
+}
+function truncate(str, len) {
+  if (!str) return "unknown";
+  return str.length > len ? str.substring(0, len - 3) + "..." : str;
+}
+function calculateFitnessChange(currentFitness, feedback, weight = 0.1) {
+  const before = currentFitness;
+  let after = currentFitness;
+  switch (feedback) {
+    case "positive":
+      after = Math.min(1, currentFitness + weight * (1 - currentFitness));
+      break;
+    case "negative":
+      after = Math.max(0, currentFitness - weight * currentFitness);
+      break;
+    case "neutral":
+      after = currentFitness + (0.5 - currentFitness) * 0.01;
+      break;
+  }
+  return { before, after: Math.round(after * 1e3) / 1e3 };
+}
+var MutationUtils = {
+  requiresConsent,
+  isWithinRollbackWindow,
+  validate: validateMutation,
+  describe: describeMutation,
+  calculateFitnessChange
+};
 export {
   GenomeRegistry,
+  MutationUtils,
+  VersioningUtils,
+  calculateFitnessChange,
+  calculateRestore,
+  describeMutation,
+  diffGenomes,
+  diffVersions,
   genomes,
   getDb,
+  getPreviousVersion,
+  getVersionHistory,
+  isWithinRollbackWindow,
   mutations,
-  schema_exports as schema
+  reconstructAtVersion,
+  requiresConsent,
+  schema_exports as schema,
+  validateMutation
 };

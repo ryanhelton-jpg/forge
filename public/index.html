@@ -282,7 +282,7 @@
 </head>
 <body>
   <header>
-    <h1>⚒️ Forge <span>v0.3</span></h1>
+    <h1>⚒️ Forge <span>v0.5</span></h1>
     <div class="header-actions">
       <button class="btn" onclick="toggleSidebar()">Config</button>
       <button class="btn" onclick="newChat()">New Chat</button>
@@ -318,12 +318,16 @@
     </div>
     <div class="sidebar-tabs">
       <div class="sidebar-tab active" onclick="switchTab('persona')">Persona</div>
+      <div class="sidebar-tab" onclick="switchTab('genome')">Genome</div>
       <div class="sidebar-tab" onclick="switchTab('memory')">Memory</div>
       <div class="sidebar-tab" onclick="switchTab('tools')">Tools</div>
     </div>
     <div class="sidebar-content">
       <div id="persona-panel" class="tab-panel active">
         <div id="persona-info">Loading...</div>
+      </div>
+      <div id="genome-panel" class="tab-panel">
+        <div id="genome-info">Loading...</div>
       </div>
       <div id="memory-panel" class="tab-panel">
         <div id="memory-list">Loading...</div>
@@ -405,11 +409,18 @@
           body: JSON.stringify({ message, sessionId }),
         });
 
+        // Check if response is JSON before parsing
+        const contentType = res.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          const text = await res.text();
+          throw new Error(`Server returned non-JSON response (${res.status}): ${text.slice(0, 100)}...`);
+        }
+
         const data = await res.json();
         waitEl.remove();
 
-        if (data.error) {
-          addMessage(`Error: ${data.error}`, 'assistant', 'error');
+        if (!res.ok || data.error) {
+          addMessage(`Error: ${data.error || `HTTP ${res.status}`}`, 'assistant', 'error');
         } else {
           // Show thinking if present
           if (data.thinking) {
@@ -459,7 +470,8 @@
     function switchTab(tab) {
       document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.remove('active'));
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-      document.querySelector(`.sidebar-tab:nth-child(${tab === 'persona' ? 1 : tab === 'memory' ? 2 : 3})`).classList.add('active');
+      const tabIndex = { persona: 1, genome: 2, memory: 3, tools: 4 }[tab] || 1;
+      document.querySelector(`.sidebar-tab:nth-child(${tabIndex})`).classList.add('active');
       document.getElementById(`${tab}-panel`).classList.add('active');
     }
 
@@ -467,6 +479,7 @@
       // Load persona
       try {
         const res = await fetch('/api/persona', { headers: { 'Authorization': `Bearer ${authToken}` } });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const persona = await res.json();
         document.getElementById('persona-status').textContent = `Persona v${persona.version}`;
         document.getElementById('persona-info').innerHTML = `
@@ -491,9 +504,98 @@
         `;
       } catch {}
 
+      // Load genome
+      try {
+        const genomeRes = await fetch('/api/genome', { headers: { 'Authorization': `Bearer ${authToken}` } });
+        if (!genomeRes.ok) throw new Error(`HTTP ${genomeRes.status}`);
+        const genome = await genomeRes.json();
+        
+        const mutationsRes = await fetch('/api/genome/mutations', { headers: { 'Authorization': `Bearer ${authToken}` } });
+        const mutations = mutationsRes.ok ? await mutationsRes.json() : [];
+        
+        document.getElementById('genome-info').innerHTML = `
+          <div class="item-card">
+            <div class="label">Version</div>
+            <div style="font-size: 1.5rem; color: #ff6b35; font-weight: 600;">${genome.version}</div>
+            <div style="color: #666; font-size: 0.85rem; margin-top: 0.25rem;">
+              ${genome.status} • ${genome.visibility}
+            </div>
+          </div>
+          <div class="item-card">
+            <div class="label">Traits (${genome.identity.personality.length})</div>
+            <div class="trait-list">
+              ${genome.identity.personality.slice(0, 10).map(t => `
+                <span class="trait" title="Weight: ${t.weight}, Source: ${t.source}">
+                  ${escapeHtml(t.name)}${t.weight < 1 ? ` (${Math.round(t.weight * 100)}%)` : ''}
+                </span>
+              `).join('')}
+              ${genome.identity.personality.length > 10 ? `<span class="trait">+${genome.identity.personality.length - 10} more</span>` : ''}
+            </div>
+          </div>
+          <div class="item-card">
+            <div class="label">Rules (${genome.identity.constraints.length})</div>
+            ${genome.identity.constraints.length > 0 
+              ? genome.identity.constraints.slice(0, 5).map(r => `
+                <div style="margin-top: 0.5rem; font-size: 0.85rem;">
+                  <span style="color: #ff6b35;">${r.type}</span>: ${escapeHtml(r.description)}
+                </div>
+              `).join('')
+              : '<div style="color: #666; margin-top: 0.5rem;">No rules defined</div>'}
+          </div>
+          <div class="item-card">
+            <div class="label">Recent Mutations (${mutations.length})</div>
+            ${mutations.length > 0 
+              ? mutations.slice(0, 5).map(m => `
+                <div style="margin-top: 0.5rem; font-size: 0.85rem;">
+                  <span style="color: #5a9; font-family: monospace;">${m.version}</span>
+                  <span style="color: #888;">${m.type}</span>: ${escapeHtml(m.description)}
+                </div>
+              `).join('')
+              : '<div style="color: #666; margin-top: 0.5rem;">No mutations yet</div>'}
+          </div>
+          <div class="item-card">
+            <div class="label">Fitness</div>
+            ${genome.fitness ? `
+              <div style="margin-top: 0.5rem;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                  <span style="color: #888;">Overall</span>
+                  <span style="color: ${genome.fitness.overall >= 0.7 ? '#5a9' : genome.fitness.overall >= 0.4 ? '#fa5' : '#f55'}; font-weight: 600;">
+                    ${Math.round(genome.fitness.overall * 100)}%
+                  </span>
+                </div>
+                <div style="background: #333; height: 6px; border-radius: 3px; overflow: hidden;">
+                  <div style="background: ${genome.fitness.overall >= 0.7 ? '#5a9' : genome.fitness.overall >= 0.4 ? '#fa5' : '#f55'}; height: 100%; width: ${genome.fitness.overall * 100}%;"></div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 0.5rem; font-size: 0.8rem; color: #888;">
+                  <div>Tasks: ${Math.round(genome.fitness.metrics.taskCompletion * 100)}%</div>
+                  <div>Satisfaction: ${Math.round(genome.fitness.metrics.userSatisfaction * 100)}%</div>
+                </div>
+                <div style="color: #666; font-size: 0.75rem; margin-top: 0.25rem;">
+                  Based on ${genome.fitness.sampleSize} interactions
+                </div>
+              </div>
+            ` : '<div style="color: #666; margin-top: 0.5rem;">No fitness data yet</div>'}
+          </div>
+          <div class="item-card">
+            <div class="label">Stats</div>
+            <div style="color: #888; font-size: 0.85rem;">
+              Interactions: ${genome.stats.totalInteractions} •
+              Tokens: ${genome.stats.totalTokens.toLocaleString()} •
+              Cost: $${genome.stats.totalCost.toFixed(4)}
+            </div>
+          </div>
+          <div class="item-card" style="display: flex; gap: 0.5rem;">
+            <button class="btn" onclick="sendFeedback('positive')" title="Good response">👍</button>
+            <button class="btn" onclick="sendFeedback('negative')" title="Bad response">👎</button>
+            <button class="btn" onclick="showRollback()" title="Rollback version">⏪ Rollback</button>
+          </div>
+        `;
+      } catch {}
+
       // Load memory
       try {
         const res = await fetch('/api/memory', { headers: { 'Authorization': `Bearer ${authToken}` } });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const facts = await res.json();
         document.getElementById('memory-list').innerHTML = facts.length === 0
           ? '<p style="color: #666;">No memories yet.</p>'
@@ -509,6 +611,7 @@
       // Load tools
       try {
         const res = await fetch('/api/tools', { headers: { 'Authorization': `Bearer ${authToken}` } });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const tools = await res.json();
         document.getElementById('tools-list').innerHTML = tools.length === 0
           ? '<p style="color: #666;">No custom tools. Ask Forge to create one!</p>'
@@ -537,6 +640,61 @@
       const div = document.createElement('div');
       div.textContent = text;
       return div.innerHTML;
+    }
+
+    async function sendFeedback(type) {
+      try {
+        const res = await fetch('/api/genome/feedback', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({ feedback: type, tokens: 0, cost: 0 }),
+        });
+        if (res.ok) {
+          loadSidebarData();
+          alert(`Feedback recorded: ${type}`);
+        }
+      } catch (e) {
+        console.error('Feedback error:', e);
+      }
+    }
+
+    async function showRollback() {
+      try {
+        const res = await fetch('/api/genome/versions', { headers: { 'Authorization': `Bearer ${authToken}` } });
+        if (!res.ok) return;
+        const data = await res.json();
+        
+        if (data.versions.length <= 1) {
+          alert('No previous versions to rollback to');
+          return;
+        }
+        
+        const versions = data.versions.slice(1).map(v => v.version).join(', ');
+        const target = prompt(`Rollback to which version?\nAvailable: ${versions}\nCurrent: ${data.current}`);
+        
+        if (target) {
+          const rollbackRes = await fetch('/api/genome/rollback', {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({ targetVersion: target }),
+          });
+          const result = await rollbackRes.json();
+          if (result.success) {
+            alert(result.message);
+            loadSidebarData();
+          } else {
+            alert(`Rollback failed: ${result.error}`);
+          }
+        }
+      } catch (e) {
+        console.error('Rollback error:', e);
+      }
     }
 
     inputEl.addEventListener('input', () => {
