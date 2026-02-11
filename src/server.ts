@@ -242,6 +242,39 @@ app.post('/api/chat', async (req, res) => {
     // Complete execution logging
     executionLog.completeRun(runId, { response, thinking: thinking ?? undefined });
     
+    // Record interaction to genome fitness (success, tokens, cost)
+    try {
+      const store = getGenomeStore();
+      const genome = getOrCreateDefaultGenome();
+      store.recordInteraction(genome.id, {
+        success: true,
+        tokens: usage.totalTokens || 0,
+        cost: usage.estimatedCost || 0,
+      });
+      
+      // Check for pending evolution proposals
+      const proposals = store.proposeEvolution(genome.id, { recentFeedback: [], recentTopics: [] });
+      if (proposals.length > 0 && genome.config.evolution.autoPropose) {
+        // Include proposals in response for user awareness
+        res.json({ 
+          response, 
+          thinking, 
+          sessionId: sid, 
+          runId,
+          usage: {
+            tokens: usage.totalTokens,
+            cost: usage.estimatedCost,
+            model: usage.model,
+          },
+          evolutionProposals: proposals,
+        });
+        return;
+      }
+    } catch (e) {
+      // Non-fatal, don't block response
+      console.error('Genome tracking error:', e);
+    }
+    
     res.json({ 
       response, 
       thinking, 
@@ -256,6 +289,14 @@ app.post('/api/chat', async (req, res) => {
   } catch (error) {
     console.error('Chat error:', error);
     executionLog.failRun(runId, error instanceof Error ? error.message : 'Unknown error');
+    
+    // Record failed interaction
+    try {
+      const store = getGenomeStore();
+      const genome = getOrCreateDefaultGenome();
+      store.recordInteraction(genome.id, { success: false, tokens: 0, cost: 0 });
+    } catch (e) {}
+    
     res.status(500).json({ error: 'Chat failed. Try again.' });
   }
 });

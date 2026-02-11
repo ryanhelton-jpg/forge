@@ -108,6 +108,29 @@
       font-style: italic;
     }
 
+    .feedback-btn {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 0.25rem;
+      font-size: 0.9rem;
+      opacity: 0.7;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+
+    .feedback-btn:hover {
+      opacity: 1;
+      transform: scale(1.2);
+    }
+
+    .msg-feedback {
+      transition: opacity 0.2s;
+    }
+
+    .message:hover .msg-feedback {
+      opacity: 1 !important;
+    }
+
     .message.error {
       background: #3a1a1a;
       border-color: #5a2a2a;
@@ -387,6 +410,97 @@
       return div;
     }
 
+    function addMessageWithFeedback(content, runId) {
+      const emptyState = chatEl.querySelector('.empty-state');
+      if (emptyState) emptyState.remove();
+
+      const div = document.createElement('div');
+      div.className = 'message assistant';
+      div.innerHTML = `
+        <div class="msg-content">${escapeHtml(content)}</div>
+        <div class="msg-feedback" style="margin-top: 0.5rem; display: flex; gap: 0.25rem; opacity: 0.6;">
+          <button class="feedback-btn" onclick="recordFeedback('positive', '${runId}', this)" title="Good response">👍</button>
+          <button class="feedback-btn" onclick="recordFeedback('negative', '${runId}', this)" title="Bad response">👎</button>
+        </div>
+      `;
+      chatEl.appendChild(div);
+      chatEl.scrollTop = chatEl.scrollHeight;
+      return div;
+    }
+
+    async function recordFeedback(type, runId, btn) {
+      try {
+        const feedbackDiv = btn.parentElement;
+        feedbackDiv.innerHTML = `<span style="font-size: 0.8rem; color: #888;">Feedback: ${type === 'positive' ? '👍' : '👎'}</span>`;
+        
+        await fetch('/api/genome/feedback', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({ feedback: type, runId }),
+        });
+        
+        loadSidebarData();
+      } catch (e) {
+        console.error('Feedback error:', e);
+      }
+    }
+
+    function showEvolutionProposals(proposals) {
+      const div = document.createElement('div');
+      div.className = 'message assistant evolution-proposal';
+      div.style.background = 'linear-gradient(135deg, #1a2a1a 0%, #162a16 100%)';
+      div.style.border = '1px solid #3a5a3a';
+      div.innerHTML = `
+        <div style="color: #5a9; font-weight: 600; margin-bottom: 0.5rem;">🧬 Evolution Proposed</div>
+        ${proposals.map(p => `
+          <div style="margin: 0.5rem 0; padding: 0.5rem; background: rgba(0,0,0,0.2); border-radius: 6px;">
+            <div style="color: #8c8;">${p.description}</div>
+            <div style="font-size: 0.8rem; color: #888; margin-top: 0.25rem;">${p.reason} (${Math.round(p.confidence * 100)}% confidence)</div>
+            <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem;">
+              <button class="btn" onclick="applyEvolution('${p.type}', '${p.description.replace(/'/g, "\\'")}', this)" style="border-color: #5a9;">Apply</button>
+              <button class="btn" onclick="this.closest('.evolution-proposal').remove()">Dismiss</button>
+            </div>
+          </div>
+        `).join('')}
+      `;
+      chatEl.appendChild(div);
+      chatEl.scrollTop = chatEl.scrollHeight;
+    }
+
+    async function applyEvolution(type, description, btn) {
+      try {
+        btn.disabled = true;
+        btn.textContent = 'Applying...';
+        
+        const res = await fetch('/api/genome/evolve', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({ type, description }),
+        });
+        
+        const result = await res.json();
+        if (result.success) {
+          btn.closest('.evolution-proposal').innerHTML = `
+            <div style="color: #5a9;">✅ Evolution applied: ${description}</div>
+            <div style="font-size: 0.8rem; color: #888;">New version: ${result.genome.version}</div>
+          `;
+          loadSidebarData();
+        } else {
+          btn.textContent = 'Failed';
+          alert(result.error);
+        }
+      } catch (e) {
+        btn.textContent = 'Failed';
+        console.error('Evolution error:', e);
+      }
+    }
+
     async function sendMessage() {
       const message = inputEl.value.trim();
       if (!message || isWaiting) return;
@@ -426,12 +540,19 @@
           if (data.thinking) {
             addThinking(data.thinking);
           }
-          addMessage(data.response, 'assistant');
+          
+          // Add message with feedback buttons
+          const msgEl = addMessageWithFeedback(data.response, data.runId);
           
           if (data.sessionId && data.sessionId !== sessionId) {
             sessionId = data.sessionId;
             localStorage.setItem('forge_session', sessionId);
             updateSessionStatus();
+          }
+          
+          // Show evolution proposals if any
+          if (data.evolutionProposals && data.evolutionProposals.length > 0) {
+            showEvolutionProposals(data.evolutionProposals);
           }
         }
       } catch (error) {
