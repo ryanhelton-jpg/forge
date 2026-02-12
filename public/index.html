@@ -1954,7 +1954,10 @@
 
             try {
               const event = JSON.parse(data);
-              if (event.type === 'thinking') {
+              if (event.type === 'status') {
+                // Show processing indicator
+                updateStreamingMessage('...');
+              } else if (event.type === 'thinking') {
                 thinking = event.content;
               } else if (event.type === 'content') {
                 fullText += event.content;

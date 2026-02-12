@@ -344,6 +344,9 @@ app.post('/api/chat/stream', async (req, res) => {
   const runId = executionLog.startRun('chat', { message: cleanMessage }, sid);
   executionLog.updateRunModel(runId, 'anthropic/claude-sonnet-4');
 
+  // Send immediate acknowledgment so UI knows processing started
+  sendEvent('status', { status: 'processing' });
+
   try {
     // Use agent.chat() for full tool support
     const { response: chatResponse, thinking, usage, toolCalls } = await agent.chat(cleanMessage);
