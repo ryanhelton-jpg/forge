@@ -1969,6 +1969,9 @@
         }
 
         finalizeStreamingMessage(fullText, thinking, runId);
+        
+        // Refresh sidebar data in case tools modified memory/persona
+        loadSidebarData();
 
         if (newSessionId !== sessionId) {
           sessionId = newSessionId;
