@@ -20,6 +20,7 @@ import { rateLimit, sanitizeInput, securityHeaders, generateToken, tokenAuth } f
 import { Orchestrator, builtInRoles } from './swarm/index.js';
 import { ExecutionLog } from './execution-log.js';
 import { parseThinking } from './llm.js';
+import { SwarmPersistence } from './swarm-persistence.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
@@ -34,15 +35,21 @@ if (!OPENROUTER_API_KEY) {
 }
 const memory = new Memory(DATA_DIR);
 const executionLog = new ExecutionLog(DATA_DIR);
+const swarmPersistence = new SwarmPersistence(DATA_DIR);
 const sessions = new Map();
 const activeSwarms = new Map();
-// Cleanup old swarm tracking (runs that finished > 5 min ago)
+// Cleanup old swarm tracking (runs that finished > 5 min ago for memory, 1 hour for disk)
 setInterval(() => {
     const now = Date.now();
     for (const [runId, swarm] of activeSwarms) {
         if (swarm.status !== 'running' && now - swarm.startedAt > 300000) {
             activeSwarms.delete(runId);
         }
+    }
+    // Clean up old persisted swarms (> 1 hour old)
+    const cleaned = swarmPersistence.cleanup();
+    if (cleaned > 0) {
+        console.log(`Cleaned up ${cleaned} old persisted swarm states`);
     }
 }, 60000);
 function buildSystemPrompt() {
@@ -475,6 +482,8 @@ async function runSwarmAsync(runId, goal, plan, protocol, agentsUsed) {
         totalTasks,
         blackboardEntries: 0,
     });
+    // Persist to disk for restart recovery
+    swarmPersistence.start(runId, swarmGoal);
     const addSwarmEvent = (event) => {
         const swarm = activeSwarms.get(runId);
         if (swarm) {
@@ -496,6 +505,7 @@ async function runSwarmAsync(runId, goal, plan, protocol, agentsUsed) {
             if (swarm) {
                 swarm.totalTasks = plan.tasks.length;
             }
+            swarmPersistence.updateProgress(runId, { totalTasks: plan.tasks.length });
             addSwarmEvent({ type: 'start', roleId: 'planner', data: { tasksCount: plan.tasks.length, protocol: plan.protocol } });
         },
         onThinking: (roleId, thinking) => {
@@ -511,6 +521,7 @@ async function runSwarmAsync(runId, goal, plan, protocol, agentsUsed) {
                 swarm.currentAgent = roleId;
                 swarm.currentTask = task.description;
             }
+            swarmPersistence.updateProgress(runId, { currentAgent: roleId, currentTask: task.description });
             addSwarmEvent({ type: 'start', roleId, taskId: task.id, data: { description: task.description } });
         },
         onAgentComplete: (roleId, task) => {
@@ -520,13 +531,20 @@ async function runSwarmAsync(runId, goal, plan, protocol, agentsUsed) {
                 swarm.completedTasks++;
                 swarm.currentAgent = undefined;
                 swarm.currentTask = undefined;
+                swarmPersistence.updateProgress(runId, {
+                    completedTasks: swarm.completedTasks,
+                    currentAgent: undefined,
+                    currentTask: undefined
+                });
             }
             addSwarmEvent({ type: 'complete', roleId, taskId: task.id });
         },
         onBlackboardUpdate: (entry) => {
             const swarm = activeSwarms.get(runId);
-            if (swarm)
+            if (swarm) {
                 swarm.blackboardEntries++;
+                swarmPersistence.updateProgress(runId, { blackboardEntries: swarm.blackboardEntries });
+            }
             addSwarmEvent({ type: 'blackboard', data: { type: entry.type, author: entry.author, preview: entry.content.slice(0, 100) } });
         },
     });
@@ -548,6 +566,17 @@ async function runSwarmAsync(runId, goal, plan, protocol, agentsUsed) {
             swarm.result = result;
             addSwarmEvent({ type: 'complete', data: { success: result.success } });
         }
+        // Persist final result to disk
+        swarmPersistence.complete(runId, {
+            success: result.success,
+            finalOutput: result.finalOutput,
+            tasks: result.tasks?.map((t) => ({
+                id: t.id,
+                description: t.description,
+                status: t.status,
+                result: t.result
+            })),
+        });
     }
     catch (error) {
         console.error('Async swarm error:', error);
@@ -558,6 +587,8 @@ async function runSwarmAsync(runId, goal, plan, protocol, agentsUsed) {
             swarm.error = error instanceof Error ? error.message : 'Unknown error';
             addSwarmEvent({ type: 'error', data: { message: error instanceof Error ? error.message : 'Unknown error' } });
         }
+        // Persist error to disk
+        swarmPersistence.error(runId, error instanceof Error ? error.message : 'Unknown error');
     }
 }
 // Swarm execution endpoint
@@ -592,6 +623,8 @@ app.post('/api/swarm', async (req, res) => {
         totalTasks,
         blackboardEntries: 0,
     });
+    // Persist to disk for restart recovery
+    swarmPersistence.start(runId, swarmGoal);
     const addSwarmEvent = (event) => {
         const swarm = activeSwarms.get(runId);
         if (swarm) {
@@ -692,6 +725,17 @@ app.post('/api/swarm', async (req, res) => {
             swarm.totalTasks = result.tasks?.length || swarm.totalTasks;
             addSwarmEvent({ type: 'complete', data: { success: result.success } });
         }
+        // Persist final result to disk
+        swarmPersistence.complete(runId, {
+            success: result.success,
+            finalOutput: result.finalOutput,
+            tasks: result.tasks?.map((t) => ({
+                id: t.id,
+                description: t.description,
+                status: t.status,
+                result: t.result
+            })),
+        });
         res.json({ ...result, runId });
     }
     catch (error) {
@@ -703,6 +747,8 @@ app.post('/api/swarm', async (req, res) => {
             swarm.status = 'error';
             addSwarmEvent({ type: 'error', data: { message: error instanceof Error ? error.message : 'Unknown error' } });
         }
+        // Persist error to disk
+        swarmPersistence.error(runId, error instanceof Error ? error.message : 'Unknown error');
         res.status(500).json({ error: 'Swarm execution failed' });
     }
 });
@@ -734,6 +780,25 @@ app.get('/api/swarm/active', (req, res) => {
 app.get('/api/swarm/:runId/status', (req, res) => {
     const swarm = activeSwarms.get(req.params.runId);
     if (!swarm) {
+        // Check persisted state (survives restarts)
+        const persisted = swarmPersistence.get(req.params.runId);
+        if (persisted) {
+            return res.json({
+                runId: persisted.runId,
+                goal: persisted.goal,
+                status: persisted.status,
+                startedAt: persisted.startedAt,
+                completedAt: persisted.completedAt,
+                completedTasks: persisted.completedTasks,
+                totalTasks: persisted.totalTasks,
+                blackboardEntries: persisted.blackboardEntries,
+                currentAgent: persisted.currentAgent,
+                currentTask: persisted.currentTask,
+                result: persisted.result,
+                error: persisted.error,
+                recovered: true, // Indicates this was recovered from disk after restart
+            });
+        }
         // Check if it's in execution history
         const run = executionLog.getRun(req.params.runId);
         if (run && run.type === 'swarm') {
