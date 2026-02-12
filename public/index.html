@@ -1963,15 +1963,20 @@
                 runId = event.runId || '';
                 newSessionId = event.sessionId || sessionId;
                 evolutionProposals = event.evolutionProposals || [];
+                // Refresh sidebar if tools modified memory/persona
+                if (event.sidebarRefresh) {
+                  loadSidebarData();
+                }
+                // Show tool usage indicator
+                if (event.toolsUsed && event.toolsUsed.length > 0) {
+                  console.log('Tools used:', event.toolsUsed);
+                }
               }
             } catch (e) {}
           }
         }
 
         finalizeStreamingMessage(fullText, thinking, runId);
-        
-        // Refresh sidebar data in case tools modified memory/persona
-        loadSidebarData();
 
         if (newSessionId !== sessionId) {
           sessionId = newSessionId;

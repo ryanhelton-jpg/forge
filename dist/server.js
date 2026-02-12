@@ -19,7 +19,6 @@ import { readFileTool, writeFileTool, listFilesTool } from './tools/file-ops.js'
 import { rateLimit, sanitizeInput, securityHeaders, generateToken, tokenAuth } from './security.js';
 import { Orchestrator, builtInRoles } from './swarm/index.js';
 import { ExecutionLog } from './execution-log.js';
-import { parseThinking } from './llm.js';
 import { SwarmPersistence } from './swarm-persistence.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -245,7 +244,7 @@ app.post('/api/chat', async (req, res) => {
         res.status(500).json({ error: 'Chat failed. Try again.' });
     }
 });
-// Streaming chat endpoint
+// Streaming chat endpoint (with tool support)
 app.post('/api/chat/stream', async (req, res) => {
     const { message, sessionId } = req.body;
     if (!message) {
@@ -273,114 +272,34 @@ app.post('/api/chat/stream', async (req, res) => {
     const runId = executionLog.startRun('chat', { message: cleanMessage }, sid);
     executionLog.updateRunModel(runId, 'anthropic/claude-sonnet-4');
     try {
-        // Add user message to history
-        const history = agent.getHistory();
-        history.push({ role: 'user', content: cleanMessage });
-        // Build messages with tools
-        const messagesWithTools = [...history];
-        if (messagesWithTools[0]?.role === 'system') {
-            // Get tool descriptions
-            const tools = agent.getRegisteredTools();
-            if (tools.length > 0) {
-                // We'll just use the regular chat path for now since streaming + tools is complex
-                // Fall back to non-streaming for tool use
-            }
-        }
-        // Stream the response
-        let fullContent = '';
-        let thinkingSent = false;
-        let responseStarted = false;
-        let lastSentLength = 0;
-        const formattedMessages = messagesWithTools.map(m => ({
-            role: m.role,
-            content: m.content,
-        }));
-        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-                'HTTP-Referer': 'https://github.com/forge-agent',
-                'X-Title': 'Forge Agent Framework',
-            },
-            body: JSON.stringify({
-                model: 'anthropic/claude-sonnet-4',
-                max_tokens: 4096,
-                messages: formattedMessages,
-                stream: true,
-            }),
+        // Use agent.chat() for full tool support
+        const { response: chatResponse, thinking, usage, toolCalls } = await agent.chat(cleanMessage);
+        memory.updateConversation(sid, agent.getHistory());
+        // Update execution log
+        executionLog.updateRunModel(runId, usage.model, {
+            prompt: usage.promptTokens,
+            completion: usage.completionTokens,
+            total: usage.totalTokens,
         });
-        if (!response.ok) {
-            const error = await response.text();
-            throw new Error(`LLM call failed: ${response.status} - ${error}`);
-        }
-        const reader = response.body?.getReader();
-        if (!reader)
-            throw new Error('No response body');
-        const decoder = new TextDecoder();
-        let buffer = '';
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done)
-                break;
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n');
-            buffer = lines.pop() || '';
-            for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                    const data = line.slice(6);
-                    if (data === '[DONE]')
-                        continue;
-                    try {
-                        const parsed = JSON.parse(data);
-                        const delta = parsed.choices?.[0]?.delta?.content;
-                        if (delta) {
-                            fullContent += delta;
-                            // Check if we have a complete thinking block
-                            const hasThinkingStart = fullContent.includes('<thinking>');
-                            const hasThinkingEnd = fullContent.includes('</thinking>');
-                            const mightHaveThinking = fullContent.startsWith('<think') || fullContent.includes('<think');
-                            if (hasThinkingStart && hasThinkingEnd && !thinkingSent) {
-                                // Extract and send complete thinking
-                                const match = fullContent.match(/<thinking>([\s\S]*?)<\/thinking>/);
-                                if (match) {
-                                    sendEvent('thinking', { content: match[1].trim() });
-                                    thinkingSent = true;
-                                }
-                            }
-                            if (hasThinkingEnd) {
-                                // We're past the thinking block, stream the response content
-                                const thinkingEndPos = fullContent.indexOf('</thinking>') + '</thinking>'.length;
-                                const responseContent = fullContent.slice(thinkingEndPos).trim();
-                                if (responseContent.length > lastSentLength) {
-                                    const newContent = responseContent.slice(lastSentLength);
-                                    sendEvent('content', { content: newContent });
-                                    lastSentLength = responseContent.length;
-                                }
-                                responseStarted = true;
-                            }
-                            else if (!hasThinkingStart && !mightHaveThinking) {
-                                // No thinking block at all, stream everything
-                                if (fullContent.length > lastSentLength) {
-                                    const newContent = fullContent.slice(lastSentLength);
-                                    sendEvent('content', { content: newContent });
-                                    lastSentLength = fullContent.length;
-                                }
-                            }
-                            // If we have <thinking> or might have one starting, wait for it to complete
-                        }
-                    }
-                    catch { }
-                }
+        // Add tool calls to execution log
+        if (toolCalls) {
+            for (const tc of toolCalls) {
+                executionLog.addToolCall(runId, {
+                    name: tc.name,
+                    input: tc.params,
+                    output: tc.result,
+                    durationMs: tc.durationMs,
+                });
             }
         }
-        // Parse final response
-        const { thinking, response: cleanResponse } = parseThinking(fullContent);
-        // Update agent history
-        history.push({ role: 'assistant', content: fullContent });
-        memory.updateConversation(sid, history);
-        // Complete execution logging
-        executionLog.completeRun(runId, { response: cleanResponse, thinking: thinking ?? undefined });
+        // Reload custom tools in case new ones were created
+        const customTools = loadAllCustomTools();
+        for (const tool of customTools) {
+            if (!agent.getRegisteredTools().includes(tool.name)) {
+                agent.registerTool(tool);
+            }
+        }
+        executionLog.completeRun(runId, { response: chatResponse, thinking: thinking ?? undefined });
         // Record interaction to genome fitness
         let evolutionProposals = [];
         try {
@@ -388,8 +307,8 @@ app.post('/api/chat/stream', async (req, res) => {
             const genome = getOrCreateDefaultGenome();
             store.recordInteraction(genome.id, {
                 success: true,
-                tokens: Math.ceil(fullContent.length / 4), // Rough estimate
-                cost: 0,
+                tokens: usage.totalTokens || 0,
+                cost: usage.estimatedCost || 0,
             });
             const proposals = store.proposeEvolution(genome.id, { recentFeedback: [], recentTopics: [] });
             if (proposals.length > 0 && genome.config.evolution.autoPropose) {
@@ -397,11 +316,25 @@ app.post('/api/chat/stream', async (req, res) => {
             }
         }
         catch (e) { }
+        // Check if any tool modified memory or persona
+        const modifyingTools = ['self_evolve', 'remember', 'forget'];
+        const sidebarRefresh = toolCalls?.some((tc) => modifyingTools.includes(tc.name)) || false;
+        // Send thinking if present
+        if (thinking) {
+            sendEvent('thinking', { content: thinking });
+        }
+        // Send response content (simulate streaming by sending chunks)
+        const chunkSize = 50;
+        for (let i = 0; i < chatResponse.length; i += chunkSize) {
+            sendEvent('content', { content: chatResponse.slice(i, i + chunkSize) });
+        }
         // Send done event with metadata
         sendEvent('done', {
             sessionId: sid,
             runId,
             evolutionProposals,
+            sidebarRefresh,
+            toolsUsed: toolCalls?.map((tc) => tc.name) || [],
         });
         res.write('data: [DONE]\n\n');
         res.end();
@@ -409,6 +342,12 @@ app.post('/api/chat/stream', async (req, res) => {
     catch (error) {
         console.error('Streaming chat error:', error);
         executionLog.failRun(runId, error instanceof Error ? error.message : 'Unknown error');
+        try {
+            const store = getGenomeStore();
+            const genome = getOrCreateDefaultGenome();
+            store.recordInteraction(genome.id, { success: false, tokens: 0, cost: 0 });
+        }
+        catch (e) { }
         sendEvent('error', { message: error instanceof Error ? error.message : 'Unknown error' });
         res.end();
     }
