@@ -3,13 +3,18 @@
 import type { Request, Response, NextFunction } from 'express';
 import { RateLimiterMemory } from 'rate-limiter-flexible';
 
-// Rate limiter: 20 requests per minute per IP
+// Rate limiter: 100 requests per minute per IP (increased for swarm polling)
 const rateLimiter = new RateLimiterMemory({
-  points: 20,
+  points: 100,
   duration: 60,
 });
 
 export async function rateLimit(req: Request, res: Response, next: NextFunction) {
+  // Skip rate limiting for swarm status/events endpoints (high-frequency polling)
+  if (req.path.match(/^\/api\/swarm\/[^/]+\/(status|events)$/)) {
+    return next();
+  }
+  
   try {
     const ip = req.ip || req.socket.remoteAddress || 'unknown';
     await rateLimiter.consume(ip);
