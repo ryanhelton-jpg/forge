@@ -4,40 +4,162 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Forge — Self-Evolving AI</title>
+  <!-- Markdown & Syntax Highlighting -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github-dark.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/core.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/languages/javascript.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/languages/typescript.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/languages/python.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/languages/bash.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/languages/json.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/languages/sql.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/languages/css.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/languages/xml.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
+    :root {
+      --bg-primary: #0a0a0a;
+      --bg-secondary: #111;
+      --bg-tertiary: #1a1a1a;
+      --border: #222;
+      --border-light: #333;
+      --text-primary: #e0e0e0;
+      --text-secondary: #888;
+      --text-dim: #555;
+      --accent: #ff6b35;
+      --accent-hover: #ff8555;
+      --success: #5a9;
+      --warning: #fa5;
+      --error: #f55;
+      --thinking-bg: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      --thinking-border: #2a3f5f;
+      --user-msg: #1a3a5c;
+      --user-text: #b8d4e8;
+      
+      /* Mode Colors */
+      --mode-chat: #ff6b35;
+      --mode-deep: #6b5bff;
+      --mode-evolution: #5bff6b;
+      --mode-swarm: #ffb35b;
+    }
+
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #0a0a0a;
-      color: #e0e0e0;
+      background: var(--bg-primary);
+      color: var(--text-primary);
       height: 100vh;
       display: flex;
       flex-direction: column;
     }
 
+    /* Header */
     header {
-      padding: 1rem 1.5rem;
-      border-bottom: 1px solid #222;
+      padding: 0.75rem 1.5rem;
+      border-bottom: 1px solid var(--border);
       display: flex;
       align-items: center;
       justify-content: space-between;
+      background: var(--bg-secondary);
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Ambient gradient bar */
+    .ambient-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--accent), var(--accent-hover), var(--accent));
+      background-size: 200% 100%;
+      animation: ambientFlow 3s ease infinite;
+    }
+
+    @keyframes ambientFlow {
+      0%, 100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+    }
+
+    .ambient-bar.thinking {
+      animation: ambientPulse 1s ease infinite;
+    }
+
+    @keyframes ambientPulse {
+      0%, 100% { opacity: 0.5; }
+      50% { opacity: 1; }
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
     }
 
     header h1 {
       font-size: 1.25rem;
       font-weight: 600;
-      color: #ff6b35;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
     }
 
-    header h1 span { opacity: 0.5; font-weight: 400; }
+    header h1 span { opacity: 0.5; font-weight: 400; font-size: 0.9rem; }
+
+    /* Mode Selector */
+    .mode-selector {
+      display: flex;
+      background: var(--bg-primary);
+      border-radius: 8px;
+      padding: 3px;
+      gap: 2px;
+    }
+
+    .mode-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      padding: 0.4rem 0.75rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .mode-btn:hover {
+      color: var(--text-secondary);
+      background: var(--bg-tertiary);
+    }
+
+    .mode-btn.active {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+    }
+
+    .mode-btn.active[data-mode="chat"] { color: var(--mode-chat); }
+    .mode-btn.active[data-mode="deep"] { color: var(--mode-deep); }
+    .mode-btn.active[data-mode="evolution"] { color: var(--mode-evolution); }
+    .mode-btn.active[data-mode="swarm"] { color: var(--mode-swarm); }
+
+    .mode-indicator {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
 
     .header-actions { display: flex; gap: 0.5rem; }
 
     .btn {
       background: transparent;
-      border: 1px solid #333;
-      color: #888;
+      border: 1px solid var(--border-light);
+      color: var(--text-secondary);
       padding: 0.5rem 1rem;
       border-radius: 6px;
       cursor: pointer;
@@ -45,91 +167,349 @@
       transition: all 0.2s;
     }
 
-    .btn:hover { border-color: #555; color: #ccc; }
-    .btn.active { border-color: #ff6b35; color: #ff6b35; }
+    .btn:hover { border-color: var(--text-dim); color: var(--text-primary); }
+    .btn.active { border-color: var(--accent); color: var(--accent); }
+    .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .btn.primary:hover { background: var(--accent-hover); }
 
+    /* Chat Area */
     #chat {
       flex: 1;
       overflow-y: auto;
       padding: 1.5rem;
       display: flex;
       flex-direction: column;
-      gap: 1rem;
+      gap: 1.25rem;
+      scroll-behavior: smooth;
     }
 
+    /* Messages */
     .message {
       max-width: 85%;
       padding: 1rem 1.25rem;
       border-radius: 12px;
-      line-height: 1.6;
-      white-space: pre-wrap;
-      word-wrap: break-word;
+      line-height: 1.7;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
     .message.user {
       align-self: flex-end;
-      background: #1a3a5c;
-      color: #b8d4e8;
+      background: var(--user-msg);
+      color: var(--user-text);
     }
 
     .message.assistant {
       align-self: flex-start;
-      background: #1a1a1a;
-      border: 1px solid #2a2a2a;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
     }
 
-    .message.thinking-msg {
-      align-self: flex-start;
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-      border: 1px solid #2a3f5f;
-      font-size: 0.9rem;
-      color: #8892b0;
-      position: relative;
-      padding-left: 2.5rem;
+    /* Markdown Styles */
+    .message.assistant .msg-content h1,
+    .message.assistant .msg-content h2,
+    .message.assistant .msg-content h3 {
+      color: var(--accent);
+      margin: 1rem 0 0.5rem 0;
+      font-weight: 600;
     }
 
-    .message.thinking-msg::before {
-      content: '🧠';
-      position: absolute;
-      left: 0.75rem;
-      top: 1rem;
+    .message.assistant .msg-content h1:first-child,
+    .message.assistant .msg-content h2:first-child,
+    .message.assistant .msg-content h3:first-child { margin-top: 0; }
+
+    .message.assistant .msg-content h1 { font-size: 1.4rem; }
+    .message.assistant .msg-content h2 { font-size: 1.2rem; }
+    .message.assistant .msg-content h3 { font-size: 1.05rem; }
+
+    .message.assistant .msg-content p { margin: 0.75rem 0; }
+    .message.assistant .msg-content p:first-child { margin-top: 0; }
+    .message.assistant .msg-content p:last-child { margin-bottom: 0; }
+
+    .message.assistant .msg-content ul,
+    .message.assistant .msg-content ol {
+      margin: 0.75rem 0;
+      padding-left: 1.5rem;
     }
 
-    .thinking-label {
+    .message.assistant .msg-content li { margin: 0.35rem 0; }
+    .message.assistant .msg-content strong { color: #fff; font-weight: 600; }
+    .message.assistant .msg-content em { color: var(--text-secondary); }
+    .message.assistant .msg-content a { color: var(--accent); text-decoration: none; }
+    .message.assistant .msg-content a:hover { text-decoration: underline; }
+
+    /* Inline Code */
+    .message.assistant .msg-content code:not(pre code) {
+      background: #2a2a2a;
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-size: 0.9em;
+      color: #e06c75;
+    }
+
+    /* Code Blocks */
+    .message.assistant .msg-content pre {
+      background: #1e1e1e;
+      border-radius: 8px;
+      margin: 1rem 0;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .message.assistant .msg-content pre code {
+      display: block;
+      padding: 1rem;
+      overflow-x: auto;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-size: 0.875rem;
+      line-height: 1.5;
+    }
+
+    .code-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.5rem 1rem;
+      background: #252525;
+      border-bottom: 1px solid var(--border);
       font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+
+    .code-header .lang { text-transform: uppercase; letter-spacing: 0.05em; }
+
+    .copy-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      cursor: pointer;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      transition: all 0.2s;
+    }
+
+    .copy-btn:hover { background: var(--border); color: var(--text-primary); }
+
+    .message.assistant .msg-content blockquote {
+      border-left: 3px solid var(--accent);
+      padding-left: 1rem;
+      margin: 0.75rem 0;
+      color: var(--text-secondary);
+      font-style: italic;
+    }
+
+    .message.assistant .msg-content table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.9rem;
+    }
+
+    .message.assistant .msg-content th,
+    .message.assistant .msg-content td {
+      border: 1px solid var(--border);
+      padding: 0.5rem 0.75rem;
+      text-align: left;
+    }
+
+    .message.assistant .msg-content th {
+      background: var(--bg-secondary);
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .message.assistant .msg-content hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 1.5rem 0;
+    }
+
+    /* Thinking Block */
+    .thinking-block {
+      background: var(--thinking-bg);
+      border: 1px solid var(--thinking-border);
+      border-radius: 8px;
+      margin-bottom: 0.75rem;
+      overflow: hidden;
+    }
+
+    .thinking-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.5rem 0.75rem;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.2s;
+    }
+
+    .thinking-header:hover { background: rgba(255,255,255,0.05); }
+
+    .thinking-header .label {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.8rem;
       color: #5a6a8a;
-      margin-bottom: 0.5rem;
       text-transform: uppercase;
       letter-spacing: 0.05em;
     }
 
-    .message.wait {
-      opacity: 0.6;
-      font-style: italic;
+    .thinking-header .toggle {
+      color: #5a6a8a;
+      font-size: 0.75rem;
+      transition: transform 0.2s;
     }
+
+    .thinking-block.expanded .thinking-header .toggle { transform: rotate(180deg); }
+
+    .thinking-content {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease;
+    }
+
+    .thinking-block.expanded .thinking-content {
+      max-height: 500px;
+      overflow-y: auto;
+    }
+
+    .thinking-content-inner {
+      padding: 0.75rem;
+      padding-top: 0;
+      font-size: 0.9rem;
+      color: #8892b0;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+
+    /* Feedback */
+    .msg-feedback {
+      display: flex;
+      gap: 0.25rem;
+      margin-top: 0.75rem;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .message:hover .msg-feedback { opacity: 1; }
 
     .feedback-btn {
       background: transparent;
-      border: none;
+      border: 1px solid transparent;
+      border-radius: 4px;
       cursor: pointer;
-      padding: 0.25rem;
+      padding: 0.25rem 0.5rem;
       font-size: 0.9rem;
       opacity: 0.7;
-      transition: opacity 0.2s, transform 0.1s;
+      transition: all 0.2s;
     }
 
     .feedback-btn:hover {
       opacity: 1;
-      transform: scale(1.2);
+      background: var(--bg-secondary);
+      border-color: var(--border);
     }
 
-    .msg-feedback {
-      transition: opacity 0.2s;
+    /* Learning Indicator */
+    .learning-indicator {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      background: linear-gradient(135deg, rgba(90, 153, 90, 0.1) 0%, rgba(90, 153, 90, 0.05) 100%);
+      border: 1px solid rgba(90, 153, 90, 0.3);
+      border-radius: 8px;
+      font-size: 0.85rem;
+      color: var(--success);
+      margin-top: 0.5rem;
+      animation: fadeIn 0.5s ease;
     }
 
-    .message:hover .msg-feedback {
-      opacity: 1 !important;
+    .learning-indicator .pulse {
+      width: 8px;
+      height: 8px;
+      background: var(--success);
+      border-radius: 50%;
+      animation: pulse 2s infinite;
     }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(1.2); }
+    }
+
+    /* Streaming Cursor */
+    .streaming-cursor {
+      display: inline-block;
+      width: 2px;
+      height: 1.1em;
+      background: var(--accent);
+      margin-left: 2px;
+      animation: blink 1s infinite;
+      vertical-align: text-bottom;
+    }
+
+    @keyframes blink {
+      0%, 50% { opacity: 1; }
+      51%, 100% { opacity: 0; }
+    }
+
+    /* Waiting State */
+    .message.waiting { color: var(--text-secondary); }
+
+    .waiting-dots {
+      display: inline-flex;
+      gap: 4px;
+    }
+
+    .waiting-dots span {
+      width: 6px;
+      height: 6px;
+      background: var(--text-secondary);
+      border-radius: 50%;
+      animation: bounce 1.4s infinite;
+    }
+
+    .waiting-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .waiting-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes bounce {
+      0%, 80%, 100% { transform: translateY(0); }
+      40% { transform: translateY(-6px); }
+    }
+
+    /* Evolution Proposal */
+    .evolution-proposal {
+      background: linear-gradient(135deg, #1a2a1a 0%, #162a16 100%) !important;
+      border: 1px solid #3a5a3a !important;
+    }
+
+    .proposal-header {
+      color: var(--success);
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .proposal-item {
+      background: rgba(0,0,0,0.2);
+      border-radius: 6px;
+      padding: 0.75rem;
+      margin: 0.5rem 0;
+    }
+
+    .proposal-description { color: #8c8; margin-bottom: 0.25rem; }
+    .proposal-reason { font-size: 0.8rem; color: var(--text-secondary); }
+    .proposal-actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
 
     .message.error {
       background: #3a1a1a;
@@ -137,31 +517,40 @@
       color: #e88;
     }
 
+    /* Input Area */
     #input-area {
       padding: 1rem 1.5rem 1.5rem;
-      border-top: 1px solid #222;
+      border-top: 1px solid var(--border);
       display: flex;
       gap: 0.75rem;
+      background: var(--bg-secondary);
     }
 
     #message-input {
       flex: 1;
-      background: #111;
-      border: 1px solid #333;
-      color: #e0e0e0;
+      background: var(--bg-primary);
+      border: 1px solid var(--border-light);
+      color: var(--text-primary);
       padding: 0.875rem 1rem;
       border-radius: 8px;
       font-size: 1rem;
       font-family: inherit;
       resize: none;
       outline: none;
-      transition: border-color 0.2s;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      min-height: 44px;
+      max-height: 200px;
     }
 
-    #message-input:focus { border-color: #ff6b35; }
+    #message-input:focus { 
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.1);
+    }
+
+    #message-input::placeholder { color: var(--text-dim); }
 
     #send-btn {
-      background: #ff6b35;
+      background: var(--accent);
       border: none;
       color: #fff;
       padding: 0 1.5rem;
@@ -169,59 +558,133 @@
       cursor: pointer;
       font-size: 1rem;
       font-weight: 500;
-      transition: background 0.2s;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
     }
 
-    #send-btn:hover { background: #ff8555; }
-    #send-btn:disabled { background: #444; cursor: not-allowed; }
+    #send-btn:hover { background: var(--accent-hover); transform: translateY(-1px); }
+    #send-btn:active { transform: translateY(0); }
+    #send-btn:disabled { background: var(--border-light); cursor: not-allowed; transform: none; }
 
+    /* Empty State */
     .empty-state {
       flex: 1;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      color: #555;
+      color: var(--text-dim);
+      gap: 0.5rem;
+      text-align: center;
+      padding: 2rem;
+    }
+
+    .empty-state .logo { 
+      font-size: 4rem; 
+      margin-bottom: 1rem;
+      filter: drop-shadow(0 0 20px rgba(255, 107, 53, 0.3));
+      animation: float 3s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+
+    .empty-state .title {
+      font-size: 1.5rem;
+      color: var(--text-primary);
+      margin-bottom: 0.5rem;
+    }
+
+    .empty-state .subtitle {
+      color: var(--text-secondary);
+      font-size: 1rem;
+      max-width: 400px;
+      line-height: 1.6;
+    }
+
+    .feature-badges {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.5rem;
+      margin-top: 1.5rem;
+    }
+
+    .badge {
+      font-size: 0.8rem;
+      padding: 0.4rem 0.75rem;
+      border-radius: 20px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      transition: all 0.2s;
+      cursor: pointer;
+    }
+
+    .badge:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      transform: translateY(-2px);
+    }
+
+    /* Status Bar */
+    .status-bar {
+      padding: 0.5rem 1rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      display: flex;
+      justify-content: space-between;
+      background: var(--bg-secondary);
+    }
+
+    .status-bar span {
+      display: flex;
+      align-items: center;
       gap: 0.5rem;
     }
 
-    .empty-state .logo { font-size: 3rem; margin-bottom: 1rem; }
-
+    /* Sidebar */
     .sidebar {
       position: fixed;
-      right: -350px;
+      right: -380px;
       top: 0;
       bottom: 0;
-      width: 350px;
-      background: #111;
-      border-left: 1px solid #222;
-      transition: right 0.3s;
+      width: 380px;
+      background: var(--bg-secondary);
+      border-left: 1px solid var(--border);
+      transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       z-index: 100;
       display: flex;
       flex-direction: column;
+      box-shadow: -10px 0 30px rgba(0,0,0,0.3);
     }
 
     .sidebar.open { right: 0; }
 
     .sidebar-header {
-      padding: 1rem;
-      border-bottom: 1px solid #222;
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border);
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
 
-    .sidebar-header h2 { font-size: 1rem; color: #ff6b35; }
-
-    .sidebar-content {
-      flex: 1;
-      overflow-y: auto;
-      padding: 1rem;
+    .sidebar-header h2 { 
+      font-size: 1rem; 
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
     }
 
     .sidebar-tabs {
       display: flex;
-      border-bottom: 1px solid #222;
+      border-bottom: 1px solid var(--border);
     }
 
     .sidebar-tab {
@@ -229,113 +692,815 @@
       padding: 0.75rem;
       text-align: center;
       cursor: pointer;
-      color: #666;
+      color: var(--text-dim);
       font-size: 0.85rem;
       border-bottom: 2px solid transparent;
+      transition: all 0.2s;
     }
 
-    .sidebar-tab.active {
-      color: #ff6b35;
-      border-bottom-color: #ff6b35;
+    .sidebar-tab:hover { color: var(--text-secondary); }
+    .sidebar-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    .sidebar-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem;
     }
 
     .tab-panel { display: none; }
     .tab-panel.active { display: block; }
 
     .item-card {
-      padding: 0.75rem;
-      background: #1a1a1a;
-      border-radius: 6px;
-      margin-bottom: 0.5rem;
-      font-size: 0.9rem;
+      padding: 0.875rem;
+      background: var(--bg-tertiary);
+      border-radius: 8px;
+      margin-bottom: 0.75rem;
+      border: 1px solid var(--border);
     }
 
     .item-card .label {
       font-size: 0.75rem;
-      color: #666;
-      margin-bottom: 0.25rem;
+      color: var(--text-dim);
+      margin-bottom: 0.5rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
     }
 
     .item-card .delete {
       float: right;
-      color: #666;
+      color: var(--text-dim);
       cursor: pointer;
+      transition: color 0.2s;
     }
 
-    .item-card .delete:hover { color: #e88; }
+    .item-card .delete:hover { color: var(--error); }
 
-    .trait-list {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-      margin-top: 0.5rem;
-    }
+    .trait-list { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 
     .trait {
       background: #2a2a4a;
-      padding: 0.25rem 0.75rem;
+      padding: 0.3rem 0.75rem;
       border-radius: 20px;
       font-size: 0.8rem;
       color: #a0a0ff;
+      border: 1px solid #3a3a5a;
     }
 
-    .status-bar {
-      padding: 0.5rem 1rem;
-      border-top: 1px solid #222;
-      font-size: 0.75rem;
-      color: #555;
-      display: flex;
-      justify-content: space-between;
-    }
-
-    .feature-badges {
-      display: flex;
-      gap: 0.5rem;
+    .fitness-bar {
+      height: 6px;
+      background: var(--border);
+      border-radius: 3px;
+      overflow: hidden;
       margin-top: 0.5rem;
     }
 
-    .badge {
+    .fitness-fill {
+      height: 100%;
+      transition: width 0.5s ease;
+    }
+
+    .fitness-fill.high { background: var(--success); }
+    .fitness-fill.medium { background: var(--warning); }
+    .fitness-fill.low { background: var(--error); }
+
+    /* Overlay */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.3s;
+      z-index: 99;
+    }
+
+    .overlay.visible { opacity: 1; visibility: visible; }
+
+    /* First Run Onboarding */
+    .onboarding-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.9);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: fadeIn 0.5s ease;
+    }
+
+    .onboarding-content {
+      max-width: 600px;
+      padding: 3rem;
+      text-align: center;
+    }
+
+    .onboarding-logo {
+      font-size: 6rem;
+      margin-bottom: 2rem;
+      animation: float 3s ease-in-out infinite;
+    }
+
+    .onboarding-title {
+      font-size: 2.5rem;
+      color: var(--accent);
+      margin-bottom: 1rem;
+      font-weight: 700;
+    }
+
+    .onboarding-subtitle {
+      font-size: 1.25rem;
+      color: var(--text-secondary);
+      margin-bottom: 2rem;
+      line-height: 1.6;
+    }
+
+    .onboarding-features {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.5rem;
+      margin-bottom: 2.5rem;
+      text-align: left;
+    }
+
+    .onboarding-feature {
+      display: flex;
+      gap: 1rem;
+      align-items: flex-start;
+    }
+
+    .onboarding-feature-icon {
+      font-size: 2rem;
+      flex-shrink: 0;
+    }
+
+    .onboarding-feature-text h3 {
+      color: var(--text-primary);
+      font-size: 1rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .onboarding-feature-text p {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+
+    .onboarding-cta {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+    }
+
+    .onboarding-cta .btn {
+      padding: 0.75rem 2rem;
+      font-size: 1rem;
+    }
+
+    /* Tutorial Tip */
+    .tutorial-tip {
+      position: fixed;
+      bottom: 100px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--accent);
+      color: #fff;
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      z-index: 50;
+      animation: slideUp 0.3s ease, pulse 2s infinite 0.3s;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      box-shadow: 0 4px 20px rgba(255, 107, 53, 0.3);
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+      to { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
+
+    .tutorial-tip .dismiss {
+      background: rgba(255,255,255,0.2);
+      border: none;
+      color: #fff;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 0.8rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Mode Descriptions */
+    .mode-description {
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      z-index: 50;
+      margin-top: 0.5rem;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.2s;
+    }
+
+    .mode-selector:hover .mode-description {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .message { max-width: 95%; }
+      .sidebar { width: 100%; right: -100%; }
+      header h1 span { display: none; }
+      .mode-selector { display: none; }
+      .onboarding-features { grid-template-columns: 1fr; }
+      .swarm-theater { flex-direction: column; }
+      .swarm-agents { flex-direction: row; flex-wrap: wrap; }
+    }
+
+    /* ============================================
+       SWARM THEATER - Multi-Agent Visualization
+       ============================================ */
+    
+    .swarm-theater {
+      position: fixed;
+      top: 60px;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: var(--bg-primary);
+      z-index: 80;
+      display: none;
+      flex-direction: row;
+    }
+
+    .swarm-theater.active {
+      display: flex;
+    }
+
+    /* Left Panel - Agent Network */
+    .swarm-network {
+      flex: 2;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .swarm-header {
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-secondary);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .swarm-goal {
+      font-size: 1rem;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .swarm-goal .icon {
+      font-size: 1.5rem;
+      animation: pulse 2s infinite;
+    }
+
+    .swarm-stats {
+      display: flex;
+      gap: 1.5rem;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+
+    .swarm-stat {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .swarm-stat .value {
+      color: var(--mode-swarm);
+      font-weight: 600;
+    }
+
+    /* Agent Grid */
+    .swarm-agents {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2rem;
+      padding: 2rem;
+      position: relative;
+    }
+
+    /* Connection Lines SVG */
+    .swarm-connections {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .swarm-connections line {
+      stroke: var(--border-light);
+      stroke-width: 2;
+      stroke-dasharray: 8, 4;
+      opacity: 0.3;
+    }
+
+    .swarm-connections line.active {
+      stroke: var(--mode-swarm);
+      opacity: 1;
+      animation: flowDash 1s linear infinite;
+    }
+
+    @keyframes flowDash {
+      to { stroke-dashoffset: -12; }
+    }
+
+    /* Agent Cards */
+    .agent-row {
+      display: flex;
+      gap: 2rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .agent-card {
+      width: 140px;
+      padding: 1.25rem;
+      background: var(--bg-tertiary);
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      text-align: center;
+      transition: all 0.3s;
+      position: relative;
+    }
+
+    .agent-card.idle {
+      opacity: 0.5;
+    }
+
+    .agent-card.thinking {
+      border-color: var(--mode-swarm);
+      box-shadow: 0 0 20px rgba(255, 179, 91, 0.3);
+      transform: scale(1.05);
+    }
+
+    .agent-card.complete {
+      border-color: var(--success);
+    }
+
+    .agent-avatar {
+      width: 50px;
+      height: 50px;
+      margin: 0 auto 0.75rem;
+      border-radius: 50%;
+      background: var(--bg-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      position: relative;
+    }
+
+    .agent-card.thinking .agent-avatar::after {
+      content: '';
+      position: absolute;
+      inset: -4px;
+      border-radius: 50%;
+      border: 2px solid var(--mode-swarm);
+      border-top-color: transparent;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .agent-name {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 0.25rem;
+    }
+
+    .agent-status {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+    }
+
+    .agent-card.thinking .agent-status {
+      color: var(--mode-swarm);
+    }
+
+    /* Current Task */
+    .current-task {
+      padding: 1rem 1.5rem;
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--border);
+    }
+
+    .current-task-label {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.5rem;
+    }
+
+    .current-task-text {
+      font-size: 0.95rem;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .current-task-text .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--border);
+      border-top-color: var(--mode-swarm);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    /* Right Panel - Activity Feed & Blackboard */
+    .swarm-sidebar {
+      width: 350px;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-secondary);
+    }
+
+    .swarm-sidebar-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .swarm-sidebar-tab {
+      flex: 1;
+      padding: 0.75rem;
+      text-align: center;
+      cursor: pointer;
+      color: var(--text-dim);
+      font-size: 0.85rem;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+    }
+
+    .swarm-sidebar-tab:hover { color: var(--text-secondary); }
+    .swarm-sidebar-tab.active { 
+      color: var(--mode-swarm); 
+      border-bottom-color: var(--mode-swarm); 
+    }
+
+    .swarm-sidebar-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem;
+    }
+
+    .swarm-panel { display: none; }
+    .swarm-panel.active { display: block; }
+
+    /* Activity Feed */
+    .activity-item {
+      display: flex;
+      gap: 0.75rem;
+      padding: 0.75rem;
+      border-radius: 8px;
+      margin-bottom: 0.5rem;
+      background: var(--bg-tertiary);
+      animation: slideIn 0.3s ease;
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    .activity-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--bg-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.9rem;
+      flex-shrink: 0;
+    }
+
+    .activity-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .activity-title {
+      font-size: 0.85rem;
+      color: var(--text-primary);
+      margin-bottom: 0.25rem;
+    }
+
+    .activity-detail {
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .activity-time {
       font-size: 0.7rem;
-      padding: 0.2rem 0.5rem;
-      border-radius: 4px;
-      background: #222;
-      color: #888;
+      color: var(--text-dim);
+    }
+
+    /* Blackboard */
+    .blackboard-item {
+      padding: 0.75rem;
+      background: var(--bg-tertiary);
+      border-radius: 8px;
+      margin-bottom: 0.5rem;
+      border-left: 3px solid var(--mode-swarm);
+    }
+
+    .blackboard-key {
+      font-size: 0.75rem;
+      color: var(--mode-swarm);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.25rem;
+    }
+
+    .blackboard-value {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    /* Swarm Complete State */
+    .swarm-complete-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.8);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      animation: fadeIn 0.5s ease;
+    }
+
+    .swarm-complete-icon {
+      font-size: 4rem;
+      margin-bottom: 1rem;
+      animation: bounceIn 0.5s ease;
+    }
+
+    @keyframes bounceIn {
+      0% { transform: scale(0); }
+      50% { transform: scale(1.2); }
+      100% { transform: scale(1); }
+    }
+
+    .swarm-complete-title {
+      font-size: 1.5rem;
+      color: var(--success);
+      margin-bottom: 0.5rem;
+    }
+
+    .swarm-complete-stats {
+      color: var(--text-secondary);
+      margin-bottom: 1.5rem;
+    }
+
+    /* Close button */
+    .swarm-close {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 1.2rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      z-index: 10;
+    }
+
+    .swarm-close:hover {
+      background: var(--error);
+      border-color: var(--error);
+      color: #fff;
     }
   </style>
 </head>
 <body>
-  <header>
-    <h1>⚒️ Forge <span>v0.5.1</span></h1>
-    <div class="header-actions">
-      <button class="btn" onclick="toggleSidebar()">Config</button>
-      <button class="btn" onclick="newChat()">New Chat</button>
+  <div class="overlay" id="overlay" onclick="toggleSidebar()"></div>
+  
+  <!-- Onboarding Overlay -->
+  <div class="onboarding-overlay" id="onboarding" style="display: none;">
+    <div class="onboarding-content">
+      <div class="onboarding-logo">⚒️</div>
+      <h1 class="onboarding-title">Welcome to Forge</h1>
+      <p class="onboarding-subtitle">An AI that evolves with you. Every conversation shapes who I become.</p>
+      
+      <div class="onboarding-features">
+        <div class="onboarding-feature">
+          <div class="onboarding-feature-icon">🧬</div>
+          <div class="onboarding-feature-text">
+            <h3>I Evolve</h3>
+            <p>My personality adapts based on your feedback and our conversations.</p>
+          </div>
+        </div>
+        <div class="onboarding-feature">
+          <div class="onboarding-feature-icon">👍</div>
+          <div class="onboarding-feature-text">
+            <h3>Your Feedback Matters</h3>
+            <p>Rate my responses to help me learn what works for you.</p>
+          </div>
+        </div>
+        <div class="onboarding-feature">
+          <div class="onboarding-feature-icon">🧠</div>
+          <div class="onboarding-feature-text">
+            <h3>I Show My Thinking</h3>
+            <p>See my reasoning process before I answer.</p>
+          </div>
+        </div>
+        <div class="onboarding-feature">
+          <div class="onboarding-feature-icon">🐝</div>
+          <div class="onboarding-feature-text">
+            <h3>Swarm Power</h3>
+            <p>For complex tasks, I coordinate multiple AI agents.</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="onboarding-cta">
+        <button class="btn primary" onclick="dismissOnboarding()">Let's Go!</button>
+      </div>
     </div>
+  </div>
+
+  <!-- Swarm Theater -->
+  <div class="swarm-theater" id="swarm-theater">
+    <button class="swarm-close" onclick="closeSwarmTheater()">✕</button>
+    
+    <div class="swarm-network">
+      <div class="swarm-header">
+        <div class="swarm-goal">
+          <span class="icon">🐝</span>
+          <span id="swarm-goal-text">Initializing swarm...</span>
+        </div>
+        <div class="swarm-stats">
+          <div class="swarm-stat">
+            <span>Tasks:</span>
+            <span class="value" id="swarm-tasks">0/0</span>
+          </div>
+          <div class="swarm-stat">
+            <span>Time:</span>
+            <span class="value" id="swarm-time">0s</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="swarm-agents">
+        <svg class="swarm-connections" id="swarm-connections"></svg>
+        
+        <div class="agent-row" id="agent-row-top">
+          <div class="agent-card idle" data-role="planner">
+            <div class="agent-avatar">📋</div>
+            <div class="agent-name">Planner</div>
+            <div class="agent-status">Idle</div>
+          </div>
+        </div>
+        
+        <div class="agent-row" id="agent-row-middle">
+          <div class="agent-card idle" data-role="researcher">
+            <div class="agent-avatar">🔍</div>
+            <div class="agent-name">Researcher</div>
+            <div class="agent-status">Idle</div>
+          </div>
+          <div class="agent-card idle" data-role="coder">
+            <div class="agent-avatar">💻</div>
+            <div class="agent-name">Coder</div>
+            <div class="agent-status">Idle</div>
+          </div>
+          <div class="agent-card idle" data-role="critic">
+            <div class="agent-avatar">🔎</div>
+            <div class="agent-name">Critic</div>
+            <div class="agent-status">Idle</div>
+          </div>
+        </div>
+        
+        <div class="agent-row" id="agent-row-bottom">
+          <div class="agent-card idle" data-role="synthesizer">
+            <div class="agent-avatar">✨</div>
+            <div class="agent-name">Synthesizer</div>
+            <div class="agent-status">Idle</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="current-task" id="current-task-panel" style="display: none;">
+        <div class="current-task-label">Current Task</div>
+        <div class="current-task-text">
+          <div class="spinner"></div>
+          <span id="current-task-text">Working...</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="swarm-sidebar">
+      <div class="swarm-sidebar-tabs">
+        <div class="swarm-sidebar-tab active" onclick="switchSwarmTab('activity')">Activity</div>
+        <div class="swarm-sidebar-tab" onclick="switchSwarmTab('blackboard')">Blackboard</div>
+      </div>
+      <div class="swarm-sidebar-content">
+        <div id="swarm-activity-panel" class="swarm-panel active"></div>
+        <div id="swarm-blackboard-panel" class="swarm-panel"></div>
+      </div>
+    </div>
+  </div>
+  
+  <header>
+    <div class="header-left">
+      <h1>⚒️ Forge <span>v0.5.1</span></h1>
+      <div class="mode-selector">
+        <button class="mode-btn active" data-mode="chat" onclick="setMode('chat')" title="Normal conversation">
+          <span class="mode-indicator"></span>Chat
+        </button>
+        <button class="mode-btn" data-mode="deep" onclick="setMode('deep')" title="Extended thinking & analysis">
+          <span class="mode-indicator"></span>Deep
+        </button>
+        <button class="mode-btn" data-mode="evolution" onclick="setMode('evolution')" title="Focus on evolving traits">
+          <span class="mode-indicator"></span>Evolve
+        </button>
+        <button class="mode-btn" data-mode="swarm" onclick="setMode('swarm')" title="Multi-agent collaboration">
+          <span class="mode-indicator"></span>Swarm
+        </button>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="btn" onclick="toggleSidebar()">⚙️ Config</button>
+      <button class="btn" onclick="newChat()">✨ New</button>
+    </div>
+    <div class="ambient-bar" id="ambient-bar"></div>
   </header>
 
   <div id="chat">
     <div class="empty-state">
       <div class="logo">⚒️</div>
-      <div style="font-size: 1.2rem; margin-bottom: 0.5rem;">Self-evolving AI agent</div>
-      <div style="color: #666; font-size: 0.9rem; margin-bottom: 1rem;">I learn from feedback and adapt my personality over time</div>
+      <div class="title">Self-Evolving AI Agent</div>
+      <div class="subtitle">I learn from your feedback and adapt my personality over time. Every interaction shapes who I become.</div>
       <div class="feature-badges">
-        <span class="badge">🧬 Evolution</span>
-        <span class="badge">🧠 Thinking</span>
-        <span class="badge">🔧 Tools</span>
-        <span class="badge">🐝 Swarm</span>
-        <span class="badge">📊 Fitness</span>
+        <span class="badge" onclick="setMode('chat')">💬 Chat</span>
+        <span class="badge" onclick="setMode('deep')">🧠 Deep Work</span>
+        <span class="badge" onclick="setMode('evolution')">🧬 Evolution Lab</span>
+        <span class="badge" onclick="setMode('swarm')">🐝 Swarm Mission</span>
       </div>
     </div>
   </div>
 
   <div id="input-area">
-    <textarea id="message-input" placeholder="Type a message..." rows="1" onkeydown="handleKeydown(event)"></textarea>
-    <button id="send-btn" onclick="sendMessage()">Send</button>
+    <textarea id="message-input" placeholder="Ask me anything..." rows="1" onkeydown="handleKeydown(event)"></textarea>
+    <button id="send-btn" onclick="sendMessage()">
+      <span>Send</span>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M22 2L11 13M22 2L15 22L11 13L2 9L22 2Z"/>
+      </svg>
+    </button>
   </div>
 
   <div class="status-bar">
-    <span id="session-status">New session</span>
-    <span id="genome-status">Genome: loading...</span>
-    <span id="persona-status">Loading...</span>
+    <span id="session-status">✨ New session</span>
+    <span id="mode-status">💬 Chat Mode</span>
+    <span id="genome-status">🧬 Loading...</span>
   </div>
 
   <div class="sidebar" id="sidebar">
@@ -366,34 +1531,139 @@
   </div>
 
   <script>
+    // Configure marked
+    marked.setOptions({
+      highlight: function(code, lang) {
+        if (lang && hljs.getLanguage(lang)) {
+          return hljs.highlight(code, { language: lang }).value;
+        }
+        return hljs.highlightAuto(code).value;
+      },
+      breaks: true,
+      gfm: true
+    });
+
     const chatEl = document.getElementById('chat');
     const inputEl = document.getElementById('message-input');
     const sendBtn = document.getElementById('send-btn');
+    const overlay = document.getElementById('overlay');
+    const ambientBar = document.getElementById('ambient-bar');
     
     let isWaiting = false;
     let sessionId = localStorage.getItem('forge_session') || null;
     let authToken = localStorage.getItem('forge_token') || null;
+    let messageCount = parseInt(localStorage.getItem('forge_msg_count') || '0');
+    let hasSeenOnboarding = localStorage.getItem('forge_onboarded') === 'true';
+    let currentMode = localStorage.getItem('forge_mode') || 'chat';
+    let feedbackGiven = parseInt(localStorage.getItem('forge_feedback_count') || '0');
 
-    // Check/prompt for token
-    function checkAuth() {
-      if (!authToken) {
-        authToken = prompt('Enter Forge access token:');
-        if (authToken) {
-          localStorage.setItem('forge_token', authToken);
-        }
+    // Mode configurations
+    const modes = {
+      chat: {
+        name: 'Chat',
+        icon: '💬',
+        color: 'var(--mode-chat)',
+        placeholder: 'Ask me anything...',
+        systemHint: '',
+        maxTokens: 4096
+      },
+      deep: {
+        name: 'Deep Work',
+        icon: '🧠',
+        color: 'var(--mode-deep)',
+        placeholder: 'Describe a complex problem to analyze...',
+        systemHint: 'Take your time. Think deeply and thoroughly. Provide comprehensive analysis.',
+        maxTokens: 8192
+      },
+      evolution: {
+        name: 'Evolution Lab',
+        icon: '🧬',
+        color: 'var(--mode-evolution)',
+        placeholder: 'Tell me how you want me to evolve...',
+        systemHint: 'Focus on self-improvement. Suggest trait additions, rule changes, or personality adjustments based on this conversation.',
+        maxTokens: 4096
+      },
+      swarm: {
+        name: 'Swarm Mission',
+        icon: '🐝',
+        color: 'var(--mode-swarm)',
+        placeholder: 'Describe a mission for the swarm...',
+        systemHint: 'This task requires multiple specialized agents working together.',
+        maxTokens: 8192,
+        useSwarm: true
       }
+    };
+
+    // Initialize
+    function init() {
+      // Show onboarding for first-time users
+      if (!hasSeenOnboarding) {
+        document.getElementById('onboarding').style.display = 'flex';
+      }
+      
+      // Set initial mode
+      setMode(currentMode, false);
+      updateSessionStatus();
+      loadSidebarData();
+      inputEl.focus();
     }
-    checkAuth();
+
+    function dismissOnboarding() {
+      document.getElementById('onboarding').style.display = 'none';
+      localStorage.setItem('forge_onboarded', 'true');
+      hasSeenOnboarding = true;
+      
+      // Show first tutorial tip
+      showTutorialTip('Try asking me something! I\'ll show you my thinking process. 🧠');
+    }
+
+    function showTutorialTip(message, duration = 8000) {
+      // Remove existing tip
+      const existing = document.querySelector('.tutorial-tip');
+      if (existing) existing.remove();
+      
+      const tip = document.createElement('div');
+      tip.className = 'tutorial-tip';
+      tip.innerHTML = `
+        <span>${message}</span>
+        <button class="dismiss" onclick="this.parentElement.remove()">✕</button>
+      `;
+      document.body.appendChild(tip);
+      
+      setTimeout(() => tip.remove(), duration);
+    }
+
+    function setMode(mode, save = true) {
+      currentMode = mode;
+      if (save) localStorage.setItem('forge_mode', mode);
+      
+      // Update UI
+      document.querySelectorAll('.mode-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mode === mode);
+      });
+      
+      // Update input placeholder
+      inputEl.placeholder = modes[mode].placeholder;
+      
+      // Update status bar
+      document.getElementById('mode-status').textContent = `${modes[mode].icon} ${modes[mode].name} Mode`;
+      
+      // Update ambient bar color
+      ambientBar.style.background = `linear-gradient(90deg, ${modes[mode].color}, ${modes[mode].color}88, ${modes[mode].color})`;
+    }
 
     function updateSessionStatus() {
       document.getElementById('session-status').textContent = 
-        sessionId ? `Session: ${sessionId.slice(0, 8)}...` : 'New session';
+        sessionId ? `💬 Session: ${sessionId.slice(0, 8)}...` : '✨ New session';
+    }
+
+    function clearEmptyState() {
+      const emptyState = chatEl.querySelector('.empty-state');
+      if (emptyState) emptyState.remove();
     }
 
     function addMessage(content, role, className = '') {
-      const emptyState = chatEl.querySelector('.empty-state');
-      if (emptyState) emptyState.remove();
-
+      clearEmptyState();
       const div = document.createElement('div');
       div.className = `message ${role} ${className}`.trim();
       div.textContent = content;
@@ -402,49 +1672,148 @@
       return div;
     }
 
-    function addThinking(content) {
-      const emptyState = chatEl.querySelector('.empty-state');
-      if (emptyState) emptyState.remove();
+    function renderMarkdown(text) {
+      let html = marked.parse(text);
+      html = html.replace(/<pre><code class="language-(\w+)">/g, (match, lang) => {
+        return `<div class="code-header"><span class="lang">${lang}</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-${lang}">`;
+      });
+      html = html.replace(/<pre><code>/g, '<div class="code-header"><span class="lang">code</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code>');
+      return html;
+    }
 
+    function copyCode(btn) {
+      const codeBlock = btn.closest('.code-header').nextElementSibling.querySelector('code');
+      navigator.clipboard.writeText(codeBlock.textContent);
+      btn.textContent = 'Copied!';
+      setTimeout(() => btn.textContent = 'Copy', 2000);
+    }
+
+    function createThinkingBlock(content, expanded = false) {
       const div = document.createElement('div');
-      div.className = 'message thinking-msg';
-      div.innerHTML = `<div class="thinking-label">Thinking</div>${escapeHtml(content)}`;
+      div.className = `thinking-block ${expanded ? 'expanded' : ''}`;
+      div.innerHTML = `
+        <div class="thinking-header" onclick="this.parentElement.classList.toggle('expanded')">
+          <div class="label">🧠 Thinking</div>
+          <div class="toggle">▼</div>
+        </div>
+        <div class="thinking-content">
+          <div class="thinking-content-inner">${escapeHtml(content)}</div>
+        </div>
+      `;
+      return div;
+    }
+
+    function createAssistantMessage(content, thinking, runId, showLearning = false) {
+      clearEmptyState();
+      
+      const div = document.createElement('div');
+      div.className = 'message assistant';
+      
+      if (thinking) {
+        div.appendChild(createThinkingBlock(thinking));
+      }
+      
+      const contentDiv = document.createElement('div');
+      contentDiv.className = 'msg-content';
+      contentDiv.innerHTML = renderMarkdown(content);
+      div.appendChild(contentDiv);
+      
+      // Add learning indicator occasionally
+      if (showLearning) {
+        const learningDiv = document.createElement('div');
+        learningDiv.className = 'learning-indicator';
+        learningDiv.innerHTML = '<div class="pulse"></div> I\'m learning from this conversation';
+        div.appendChild(learningDiv);
+      }
+      
+      const feedbackDiv = document.createElement('div');
+      feedbackDiv.className = 'msg-feedback';
+      feedbackDiv.innerHTML = `
+        <button class="feedback-btn" onclick="recordFeedback('positive', '${runId}', this)" title="Good response">👍</button>
+        <button class="feedback-btn" onclick="recordFeedback('negative', '${runId}', this)" title="Bad response">👎</button>
+      `;
+      div.appendChild(feedbackDiv);
+      
       chatEl.appendChild(div);
       chatEl.scrollTop = chatEl.scrollHeight;
       return div;
     }
 
-    function addMessageWithFeedback(content, runId) {
-      const emptyState = chatEl.querySelector('.empty-state');
-      if (emptyState) emptyState.remove();
-
+    function createStreamingMessage() {
+      clearEmptyState();
       const div = document.createElement('div');
       div.className = 'message assistant';
-      div.innerHTML = `
-        <div class="msg-content">${escapeHtml(content)}</div>
-        <div class="msg-feedback" style="margin-top: 0.5rem; display: flex; gap: 0.25rem; opacity: 0.6;">
-          <button class="feedback-btn" onclick="recordFeedback('positive', '${runId}', this)" title="Good response">👍</button>
-          <button class="feedback-btn" onclick="recordFeedback('negative', '${runId}', this)" title="Bad response">👎</button>
-        </div>
-      `;
+      div.id = 'streaming-msg';
+      const contentDiv = document.createElement('div');
+      contentDiv.className = 'msg-content';
+      contentDiv.innerHTML = '<span class="streaming-cursor"></span>';
+      div.appendChild(contentDiv);
       chatEl.appendChild(div);
       chatEl.scrollTop = chatEl.scrollHeight;
       return div;
+    }
+
+    function updateStreamingMessage(text) {
+      const el = document.getElementById('streaming-msg');
+      if (!el) return;
+      const contentDiv = el.querySelector('.msg-content');
+      contentDiv.innerHTML = renderMarkdown(text) + '<span class="streaming-cursor"></span>';
+      chatEl.scrollTop = chatEl.scrollHeight;
+    }
+
+    function finalizeStreamingMessage(text, thinking, runId) {
+      const el = document.getElementById('streaming-msg');
+      if (!el) return createAssistantMessage(text, thinking, runId);
+      
+      el.id = '';
+      el.innerHTML = '';
+      
+      if (thinking) {
+        el.appendChild(createThinkingBlock(thinking));
+      }
+      
+      const contentDiv = document.createElement('div');
+      contentDiv.className = 'msg-content';
+      contentDiv.innerHTML = renderMarkdown(text);
+      el.appendChild(contentDiv);
+      
+      // Show learning indicator every 5 messages
+      if (messageCount % 5 === 0 && messageCount > 0) {
+        const learningDiv = document.createElement('div');
+        learningDiv.className = 'learning-indicator';
+        learningDiv.innerHTML = '<div class="pulse"></div> I\'m learning from this conversation';
+        el.appendChild(learningDiv);
+      }
+      
+      const feedbackDiv = document.createElement('div');
+      feedbackDiv.className = 'msg-feedback';
+      feedbackDiv.innerHTML = `
+        <button class="feedback-btn" onclick="recordFeedback('positive', '${runId}', this)" title="Good response">👍</button>
+        <button class="feedback-btn" onclick="recordFeedback('negative', '${runId}', this)" title="Bad response">👎</button>
+      `;
+      el.appendChild(feedbackDiv);
+      
+      return el;
     }
 
     async function recordFeedback(type, runId, btn) {
       try {
         const feedbackDiv = btn.parentElement;
-        feedbackDiv.innerHTML = `<span style="font-size: 0.8rem; color: #888;">Feedback: ${type === 'positive' ? '👍' : '👎'}</span>`;
+        feedbackDiv.innerHTML = `<span style="font-size: 0.8rem; color: var(--text-secondary);">Thanks for the feedback! ${type === 'positive' ? '👍' : '👎'}</span>`;
         
         await fetch('/api/genome/feedback', {
           method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`
-          },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
           body: JSON.stringify({ feedback: type, runId }),
         });
+        
+        feedbackGiven++;
+        localStorage.setItem('forge_feedback_count', feedbackGiven.toString());
+        
+        // Show encouragement on first feedback
+        if (feedbackGiven === 1) {
+          showTutorialTip('Awesome! Your feedback helps me evolve. Keep it coming! 🧬');
+        }
         
         loadSidebarData();
       } catch (e) {
@@ -455,16 +1824,14 @@
     function showEvolutionProposals(proposals) {
       const div = document.createElement('div');
       div.className = 'message assistant evolution-proposal';
-      div.style.background = 'linear-gradient(135deg, #1a2a1a 0%, #162a16 100%)';
-      div.style.border = '1px solid #3a5a3a';
       div.innerHTML = `
-        <div style="color: #5a9; font-weight: 600; margin-bottom: 0.5rem;">🧬 Evolution Proposed</div>
+        <div class="proposal-header">🧬 Evolution Proposed</div>
         ${proposals.map(p => `
-          <div style="margin: 0.5rem 0; padding: 0.5rem; background: rgba(0,0,0,0.2); border-radius: 6px;">
-            <div style="color: #8c8;">${p.description}</div>
-            <div style="font-size: 0.8rem; color: #888; margin-top: 0.25rem;">${p.reason} (${Math.round(p.confidence * 100)}% confidence)</div>
-            <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem;">
-              <button class="btn" onclick="applyEvolution('${p.type}', '${p.description.replace(/'/g, "\\'")}', this)" style="border-color: #5a9;">Apply</button>
+          <div class="proposal-item">
+            <div class="proposal-description">${escapeHtml(p.description)}</div>
+            <div class="proposal-reason">${escapeHtml(p.reason)} • ${Math.round(p.confidence * 100)}% confidence</div>
+            <div class="proposal-actions">
+              <button class="btn primary" onclick="applyEvolution('${p.type}', '${p.description.replace(/'/g, "\\'")}', this)">Apply</button>
               <button class="btn" onclick="this.closest('.evolution-proposal').remove()">Dismiss</button>
             </div>
           </div>
@@ -481,27 +1848,26 @@
         
         const res = await fetch('/api/genome/evolve', {
           method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`
-          },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
           body: JSON.stringify({ type, description }),
         });
         
         const result = await res.json();
         if (result.success) {
           btn.closest('.evolution-proposal').innerHTML = `
-            <div style="color: #5a9;">✅ Evolution applied: ${description}</div>
-            <div style="font-size: 0.8rem; color: #888;">New version: ${result.genome.version}</div>
+            <div class="proposal-header">✅ Evolution Applied</div>
+            <div class="proposal-item">
+              <div class="proposal-description">${escapeHtml(description)}</div>
+              <div class="proposal-reason">New version: ${result.genome.version}</div>
+            </div>
           `;
+          showTutorialTip('🧬 I just evolved! My behavior will reflect this change.');
           loadSidebarData();
         } else {
           btn.textContent = 'Failed';
-          alert(result.error);
         }
       } catch (e) {
         btn.textContent = 'Failed';
-        console.error('Evolution error:', e);
       }
     }
 
@@ -512,62 +1878,441 @@
       addMessage(message, 'user');
       inputEl.value = '';
       inputEl.style.height = 'auto';
+      
+      messageCount++;
+      localStorage.setItem('forge_msg_count', messageCount.toString());
 
       isWaiting = true;
       sendBtn.disabled = true;
-      const waitEl = addMessage('thinking...', 'assistant', 'wait');
+      ambientBar.classList.add('thinking');
 
-      try {
-        const res = await fetch('/api/chat', {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`
-          },
-          body: JSON.stringify({ message, sessionId }),
-        });
-
-        // Check if response is JSON before parsing
-        const contentType = res.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-          const text = await res.text();
-          throw new Error(`Server returned non-JSON response (${res.status}): ${text.slice(0, 100)}...`);
-        }
-
-        const data = await res.json();
-        waitEl.remove();
-
-        if (!res.ok || data.error) {
-          addMessage(`Error: ${data.error || `HTTP ${res.status}`}`, 'assistant', 'error');
-        } else {
-          // Show thinking if present
-          if (data.thinking) {
-            addThinking(data.thinking);
-          }
-          
-          // Add message with feedback buttons
-          const msgEl = addMessageWithFeedback(data.response, data.runId);
-          
-          if (data.sessionId && data.sessionId !== sessionId) {
-            sessionId = data.sessionId;
-            localStorage.setItem('forge_session', sessionId);
-            updateSessionStatus();
-          }
-          
-          // Show evolution proposals if any
-          if (data.evolutionProposals && data.evolutionProposals.length > 0) {
-            showEvolutionProposals(data.evolutionProposals);
-          }
-        }
-      } catch (error) {
-        waitEl.remove();
-        addMessage(`Error: ${error.message}`, 'assistant', 'error');
+      // Check if swarm mode
+      if (currentMode === 'swarm') {
+        await sendSwarmMessage(message);
+      } else {
+        await sendStreamingMessage(message);
       }
 
+      ambientBar.classList.remove('thinking');
       isWaiting = false;
       sendBtn.disabled = false;
       inputEl.focus();
       loadSidebarData();
+      
+      // Show feedback tip after first few messages if no feedback given
+      if (messageCount === 3 && feedbackGiven === 0) {
+        showTutorialTip('💡 Tip: Use 👍/👎 on my responses to help me learn your preferences!');
+      }
+      
+      // Suggest evolution mode after several messages
+      if (messageCount === 10 && currentMode === 'chat') {
+        showTutorialTip('🧬 Try Evolution Lab mode to customize my personality!');
+      }
+    }
+
+    async function sendStreamingMessage(message) {
+      createStreamingMessage();
+      
+      let fullText = '';
+      let thinking = '';
+      let runId = '';
+      let newSessionId = sessionId;
+      let evolutionProposals = [];
+      
+      // Add mode hint to message if applicable
+      const modeHint = modes[currentMode].systemHint;
+      const enhancedMessage = modeHint ? `[Mode: ${modes[currentMode].name}] ${modeHint}\n\nUser: ${message}` : message;
+      
+      try {
+        const res = await fetch('/api/chat/stream', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+          body: JSON.stringify({ message: enhancedMessage, sessionId }),
+        });
+
+        if (!res.ok) {
+          const error = await res.json();
+          throw new Error(error.error || `HTTP ${res.status}`);
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const data = line.slice(6);
+            if (data === '[DONE]') continue;
+
+            try {
+              const event = JSON.parse(data);
+              if (event.type === 'thinking') {
+                thinking = event.content;
+              } else if (event.type === 'content') {
+                fullText += event.content;
+                updateStreamingMessage(fullText);
+              } else if (event.type === 'done') {
+                runId = event.runId || '';
+                newSessionId = event.sessionId || sessionId;
+                evolutionProposals = event.evolutionProposals || [];
+              }
+            } catch (e) {}
+          }
+        }
+
+        finalizeStreamingMessage(fullText, thinking, runId);
+
+        if (newSessionId !== sessionId) {
+          sessionId = newSessionId;
+          localStorage.setItem('forge_session', sessionId);
+          updateSessionStatus();
+        }
+
+        if (evolutionProposals.length > 0) {
+          showEvolutionProposals(evolutionProposals);
+        }
+
+      } catch (error) {
+        const el = document.getElementById('streaming-msg');
+        if (el) el.remove();
+        addMessage(`Error: ${error.message}`, 'assistant', 'error');
+      }
+    }
+
+    // ============================================
+    // SWARM THEATER - Multi-Agent Visualization
+    // ============================================
+    
+    let activeSwarmRunId = null;
+    let swarmPollInterval = null;
+    let swarmStartTime = null;
+    let swarmEventIndex = 0;
+    
+    const agentEmojis = {
+      planner: '📋',
+      researcher: '🔍',
+      coder: '💻',
+      critic: '🔎',
+      synthesizer: '✨'
+    };
+
+    function openSwarmTheater(goal) {
+      document.getElementById('swarm-theater').classList.add('active');
+      document.getElementById('swarm-goal-text').textContent = goal;
+      document.getElementById('swarm-tasks').textContent = '0/0';
+      document.getElementById('swarm-time').textContent = '0s';
+      document.getElementById('current-task-panel').style.display = 'none';
+      document.getElementById('swarm-activity-panel').innerHTML = '';
+      document.getElementById('swarm-blackboard-panel').innerHTML = '';
+      
+      // Reset all agents to idle
+      document.querySelectorAll('.agent-card').forEach(card => {
+        card.className = 'agent-card idle';
+        card.querySelector('.agent-status').textContent = 'Idle';
+      });
+      
+      swarmStartTime = Date.now();
+      swarmEventIndex = 0;
+    }
+
+    function closeSwarmTheater() {
+      document.getElementById('swarm-theater').classList.remove('active');
+      if (swarmPollInterval) {
+        clearInterval(swarmPollInterval);
+        swarmPollInterval = null;
+      }
+      activeSwarmRunId = null;
+    }
+
+    function switchSwarmTab(tab) {
+      document.querySelectorAll('.swarm-sidebar-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.swarm-panel').forEach(p => p.classList.remove('active'));
+      
+      if (tab === 'activity') {
+        document.querySelector('.swarm-sidebar-tab:nth-child(1)').classList.add('active');
+        document.getElementById('swarm-activity-panel').classList.add('active');
+      } else {
+        document.querySelector('.swarm-sidebar-tab:nth-child(2)').classList.add('active');
+        document.getElementById('swarm-blackboard-panel').classList.add('active');
+      }
+    }
+
+    function updateSwarmTime() {
+      if (swarmStartTime) {
+        const elapsed = Math.round((Date.now() - swarmStartTime) / 1000);
+        document.getElementById('swarm-time').textContent = elapsed + 's';
+      }
+    }
+
+    function setAgentState(roleId, state, statusText) {
+      const card = document.querySelector(`.agent-card[data-role="${roleId}"]`);
+      if (card) {
+        card.className = `agent-card ${state}`;
+        card.querySelector('.agent-status').textContent = statusText;
+      }
+    }
+
+    function addActivityItem(icon, title, detail) {
+      const panel = document.getElementById('swarm-activity-panel');
+      const item = document.createElement('div');
+      item.className = 'activity-item';
+      item.innerHTML = `
+        <div class="activity-icon">${icon}</div>
+        <div class="activity-content">
+          <div class="activity-title">${escapeHtml(title)}</div>
+          <div class="activity-detail">${escapeHtml(detail)}</div>
+        </div>
+        <div class="activity-time">${Math.round((Date.now() - swarmStartTime) / 1000)}s</div>
+      `;
+      panel.insertBefore(item, panel.firstChild);
+      
+      // Keep max 50 items
+      while (panel.children.length > 50) {
+        panel.removeChild(panel.lastChild);
+      }
+    }
+
+    function addBlackboardEntry(key, value) {
+      const panel = document.getElementById('swarm-blackboard-panel');
+      const item = document.createElement('div');
+      item.className = 'blackboard-item';
+      item.innerHTML = `
+        <div class="blackboard-key">${escapeHtml(key)}</div>
+        <div class="blackboard-value">${escapeHtml(String(value).slice(0, 500))}</div>
+      `;
+      panel.insertBefore(item, panel.firstChild);
+    }
+
+    function showSwarmComplete(result) {
+      const network = document.querySelector('.swarm-network');
+      
+      // Reset all agents to complete state
+      document.querySelectorAll('.agent-card').forEach(card => {
+        card.className = 'agent-card complete';
+        card.querySelector('.agent-status').textContent = 'Done';
+      });
+      
+      // Hide current task
+      document.getElementById('current-task-panel').style.display = 'none';
+      
+      // Show completion overlay
+      const overlay = document.createElement('div');
+      overlay.className = 'swarm-complete-overlay';
+      overlay.innerHTML = `
+        <div class="swarm-complete-icon">✅</div>
+        <div class="swarm-complete-title">Swarm Complete!</div>
+        <div class="swarm-complete-stats">
+          ${result.completedTasks || 0} tasks completed in ${document.getElementById('swarm-time').textContent}
+        </div>
+        <button class="btn primary" onclick="closeSwarmTheater()">View Results</button>
+      `;
+      network.appendChild(overlay);
+    }
+
+    async function pollSwarmStatus() {
+      if (!activeSwarmRunId) return;
+      
+      try {
+        // Update time
+        updateSwarmTime();
+        
+        // Build headers (only include auth if we have a token)
+        const pollHeaders = authToken ? { 'Authorization': `Bearer ${authToken}` } : {};
+        
+        // Fetch status
+        const statusRes = await fetch(`/api/swarm/${activeSwarmRunId}/status`, {
+          headers: pollHeaders
+        });
+        
+        if (!statusRes.ok) {
+          console.log('Swarm status not found, might be complete');
+          return;
+        }
+        
+        const status = await statusRes.json();
+        
+        // Update task counter
+        document.getElementById('swarm-tasks').textContent = 
+          `${status.completedTasks || 0}/${status.totalTasks || '?'}`;
+        
+        // Update current agent
+        if (status.currentAgent) {
+          setAgentState(status.currentAgent, 'thinking', 'Working...');
+          document.getElementById('current-task-panel').style.display = 'block';
+          document.getElementById('current-task-text').textContent = 
+            status.currentTask || 'Processing...';
+        }
+        
+        // Fetch events
+        const eventsRes = await fetch(
+          `/api/swarm/${activeSwarmRunId}/events?since=${swarmEventIndex}`,
+          { headers: pollHeaders }
+        );
+        
+        if (eventsRes.ok) {
+          const eventsData = await eventsRes.json();
+          
+          for (const event of eventsData.events) {
+            processSwarmEvent(event);
+          }
+          
+          swarmEventIndex = eventsData.nextIndex;
+          
+          // Check if complete
+          if (eventsData.status === 'complete' || eventsData.status === 'error') {
+            clearInterval(swarmPollInterval);
+            swarmPollInterval = null;
+          }
+        }
+        
+      } catch (e) {
+        console.error('Swarm poll error:', e);
+      }
+    }
+
+    function processSwarmEvent(event) {
+      switch (event.type) {
+        case 'start':
+          addActivityItem('🚀', 'Swarm Started', event.data?.goal || 'Mission initiated');
+          break;
+          
+        case 'thinking':
+          if (event.roleId) {
+            setAgentState(event.roleId, 'thinking', 'Thinking...');
+            addActivityItem(
+              agentEmojis[event.roleId] || '🤖',
+              `${event.roleId} thinking`,
+              event.data?.preview || 'Processing...'
+            );
+          }
+          break;
+          
+        case 'complete':
+          if (event.roleId) {
+            setAgentState(event.roleId, 'complete', 'Done');
+            addActivityItem(
+              '✅',
+              `${event.roleId} completed`,
+              event.taskId || 'Task finished'
+            );
+          }
+          break;
+          
+        case 'blackboard':
+          if (event.data?.key) {
+            addBlackboardEntry(event.data.key, event.data.value);
+            addActivityItem('📝', 'Blackboard Update', event.data.key);
+          }
+          break;
+          
+        case 'error':
+          addActivityItem('❌', 'Error', event.data?.message || 'Something went wrong');
+          break;
+      }
+    }
+
+    async function sendSwarmMessage(message) {
+      // Open the theater
+      openSwarmTheater(message);
+      addActivityItem('🚀', 'Mission Started', message);
+      
+      try {
+        // Start the swarm in async mode (returns immediately)
+        const headers = { 'Content-Type': 'application/json' };
+        if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+        
+        const startRes = await fetch('/api/swarm', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ goal: message, async: true }),
+        });
+        
+        if (!startRes.ok) {
+          throw new Error(`Failed to start swarm: ${startRes.status}`);
+        }
+        
+        const startResult = await startRes.json();
+        activeSwarmRunId = startResult.runId;
+        addActivityItem('🔗', 'Swarm Started', `ID: ${activeSwarmRunId.slice(0, 8)}...`);
+        
+        // Start polling for updates
+        swarmPollInterval = setInterval(pollSwarmStatus, 500);
+        
+        // Poll until complete
+        let complete = false;
+        let result = null;
+        
+        while (!complete) {
+          await new Promise(r => setTimeout(r, 1000));
+          
+          try {
+            const statusHeaders = {};
+            if (authToken) statusHeaders['Authorization'] = `Bearer ${authToken}`;
+            const statusRes = await fetch(`/api/swarm/${activeSwarmRunId}/status`, {
+              headers: statusHeaders
+            });
+            
+            if (statusRes.ok) {
+              const status = await statusRes.json();
+              
+              if (status.status === 'complete') {
+                complete = true;
+                result = status.result || { success: true, tasks: [] };
+              } else if (status.status === 'error') {
+                complete = true;
+                throw new Error(status.error || 'Swarm failed');
+              }
+            }
+          } catch (e) {
+            if (e.message?.includes('Swarm failed')) throw e;
+            console.log('Status poll error, retrying...', e);
+          }
+        }
+        
+        // Stop polling
+        if (swarmPollInterval) {
+          clearInterval(swarmPollInterval);
+          swarmPollInterval = null;
+        }
+        
+        // Show completion
+        showSwarmComplete(result || { completedTasks: 0 });
+        
+        // Add result to chat
+        const div = document.createElement('div');
+        div.className = 'message assistant';
+        div.innerHTML = `
+          <div style="color: var(--mode-swarm); font-weight: 600; margin-bottom: 0.75rem;">
+            🐝 Swarm Complete
+          </div>
+          <div class="msg-content">${renderMarkdown(result?.finalOutput || result?.synthesis || 'Swarm completed successfully.')}</div>
+          <div style="font-size: 0.8rem; color: var(--text-dim); margin-top: 0.75rem;">
+            ${result?.tasks?.length || 0} tasks completed
+          </div>
+        `;
+        chatEl.appendChild(div);
+        chatEl.scrollTop = chatEl.scrollHeight;
+        
+      } catch (error) {
+        // Stop polling
+        if (swarmPollInterval) {
+          clearInterval(swarmPollInterval);
+          swarmPollInterval = null;
+        }
+        
+        addActivityItem('❌', 'Error', error.message || 'Connection failed');
+        addMessage(`Swarm error: ${error.message}`, 'assistant', 'error');
+      } finally {
+        activeSwarmRunId = null;
+      }
     }
 
     async function newChat() {
@@ -576,11 +2321,13 @@
       chatEl.innerHTML = `
         <div class="empty-state">
           <div class="logo">⚒️</div>
-          <div>Self-evolving AI agent</div>
+          <div class="title">Self-Evolving AI Agent</div>
+          <div class="subtitle">I learn from your feedback and adapt my personality over time. Every interaction shapes who I become.</div>
           <div class="feature-badges">
-            <span class="badge">🧬 Self-Evolution</span>
-            <span class="badge">🧠 Thinking</span>
-            <span class="badge">🔧 Tool Creation</span>
+            <span class="badge" onclick="setMode('chat')">💬 Chat</span>
+            <span class="badge" onclick="setMode('deep')">🧠 Deep Work</span>
+            <span class="badge" onclick="setMode('evolution')">🧬 Evolution Lab</span>
+            <span class="badge" onclick="setMode('swarm')">🐝 Swarm Mission</span>
           </div>
         </div>
       `;
@@ -588,8 +2335,10 @@
     }
 
     function toggleSidebar() {
-      document.getElementById('sidebar').classList.toggle('open');
-      loadSidebarData();
+      const sidebar = document.getElementById('sidebar');
+      sidebar.classList.toggle('open');
+      overlay.classList.toggle('visible');
+      if (sidebar.classList.contains('open')) loadSidebarData();
     }
 
     function switchTab(tab) {
@@ -604,137 +2353,78 @@
       // Load persona
       try {
         const res = await fetch('/api/persona', { headers: { 'Authorization': `Bearer ${authToken}` } });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) throw new Error();
         const persona = await res.json();
-        document.getElementById('persona-status').textContent = `Persona v${persona.version}`;
         document.getElementById('persona-info').innerHTML = `
           <div class="item-card">
             <div class="label">Traits</div>
             <div class="trait-list">
-              ${persona.traits.map(t => `<span class="trait">${t}</span>`).join('')}
+              ${persona.traits.map(t => `<span class="trait">${escapeHtml(t)}</span>`).join('')}
             </div>
           </div>
           <div class="item-card">
             <div class="label">Rules (${persona.rules.length})</div>
             ${persona.rules.length > 0 
-              ? persona.rules.map((r, i) => `<div style="margin-top: 0.5rem;">${i + 1}. ${escapeHtml(r)}</div>`).join('')
-              : '<div style="color: #666; margin-top: 0.5rem;">No rules defined</div>'}
-          </div>
-          <div class="item-card">
-            <div class="label">Tip</div>
-            <div style="color: #888; font-size: 0.85rem;">
-              Ask Forge to "add a rule" or "change your personality" to evolve!
-            </div>
+              ? persona.rules.map((r, i) => `<div style="margin-top: 0.5rem; color: var(--text-secondary);">${i + 1}. ${escapeHtml(r)}</div>`).join('')
+              : '<div style="color: var(--text-dim);">No rules defined</div>'}
           </div>
         `;
       } catch {}
 
       // Load genome
       try {
-        const genomeRes = await fetch('/api/genome', { headers: { 'Authorization': `Bearer ${authToken}` } });
-        if (!genomeRes.ok) throw new Error(`HTTP ${genomeRes.status}`);
-        const genome = await genomeRes.json();
+        const res = await fetch('/api/genome', { headers: { 'Authorization': `Bearer ${authToken}` } });
+        if (!res.ok) throw new Error();
+        const genome = await res.json();
         
-        const mutationsRes = await fetch('/api/genome/mutations', { headers: { 'Authorization': `Bearer ${authToken}` } });
-        const mutations = mutationsRes.ok ? await mutationsRes.json() : [];
+        const fitnessLevel = genome.fitness?.overall >= 0.7 ? 'high' : genome.fitness?.overall >= 0.4 ? 'medium' : 'low';
+        const fitnessEmoji = fitnessLevel === 'high' ? '💚' : fitnessLevel === 'medium' ? '💛' : '❤️';
         
         document.getElementById('genome-info').innerHTML = `
           <div class="item-card">
             <div class="label">Version</div>
-            <div style="font-size: 1.5rem; color: #ff6b35; font-weight: 600;">${genome.version}</div>
-            <div style="color: #666; font-size: 0.85rem; margin-top: 0.25rem;">
-              ${genome.status} • ${genome.visibility}
-            </div>
+            <div style="font-size: 1.75rem; color: var(--accent); font-weight: 600;">${genome.version}</div>
           </div>
           <div class="item-card">
-            <div class="label">Traits (${genome.identity.personality.length})</div>
-            <div class="trait-list">
-              ${genome.identity.personality.slice(0, 10).map(t => `
-                <span class="trait" title="Weight: ${t.weight}, Source: ${t.source}">
-                  ${escapeHtml(t.name)}${t.weight < 1 ? ` (${Math.round(t.weight * 100)}%)` : ''}
-                </span>
-              `).join('')}
-              ${genome.identity.personality.length > 10 ? `<span class="trait">+${genome.identity.personality.length - 10} more</span>` : ''}
-            </div>
-          </div>
-          <div class="item-card">
-            <div class="label">Rules (${genome.identity.constraints.length})</div>
-            ${genome.identity.constraints.length > 0 
-              ? genome.identity.constraints.slice(0, 5).map(r => `
-                <div style="margin-top: 0.5rem; font-size: 0.85rem;">
-                  <span style="color: #ff6b35;">${r.type}</span>: ${escapeHtml(r.description)}
-                </div>
-              `).join('')
-              : '<div style="color: #666; margin-top: 0.5rem;">No rules defined</div>'}
-          </div>
-          <div class="item-card">
-            <div class="label">Recent Mutations (${mutations.length})</div>
-            ${mutations.length > 0 
-              ? mutations.slice(0, 5).map(m => `
-                <div style="margin-top: 0.5rem; font-size: 0.85rem;">
-                  <span style="color: #5a9; font-family: monospace;">${m.version}</span>
-                  <span style="color: #888;">${m.type}</span>: ${escapeHtml(m.description)}
-                </div>
-              `).join('')
-              : '<div style="color: #666; margin-top: 0.5rem;">No mutations yet</div>'}
-          </div>
-          <div class="item-card">
-            <div class="label">Fitness</div>
+            <div class="label">Fitness ${fitnessEmoji}</div>
             ${genome.fitness ? `
-              <div style="margin-top: 0.5rem;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
-                  <span style="color: #888;">Overall</span>
-                  <span style="color: ${genome.fitness.overall >= 0.7 ? '#5a9' : genome.fitness.overall >= 0.4 ? '#fa5' : '#f55'}; font-weight: 600;">
-                    ${Math.round(genome.fitness.overall * 100)}%
-                  </span>
-                </div>
-                <div style="background: #333; height: 6px; border-radius: 3px; overflow: hidden;">
-                  <div style="background: ${genome.fitness.overall >= 0.7 ? '#5a9' : genome.fitness.overall >= 0.4 ? '#fa5' : '#f55'}; height: 100%; width: ${genome.fitness.overall * 100}%;"></div>
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 0.5rem; font-size: 0.8rem; color: #888;">
-                  <div>Tasks: ${Math.round(genome.fitness.metrics.taskCompletion * 100)}%</div>
-                  <div>Satisfaction: ${Math.round(genome.fitness.metrics.userSatisfaction * 100)}%</div>
-                </div>
-                <div style="color: #666; font-size: 0.75rem; margin-top: 0.25rem;">
-                  Based on ${genome.fitness.sampleSize} interactions
-                </div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                <span>Overall</span>
+                <span style="font-weight: 600;">${Math.round(genome.fitness.overall * 100)}%</span>
               </div>
-            ` : '<div style="color: #666; margin-top: 0.5rem;">No fitness data yet</div>'}
+              <div class="fitness-bar">
+                <div class="fitness-fill ${fitnessLevel}" style="width: ${genome.fitness.overall * 100}%;"></div>
+              </div>
+              <div style="font-size: 0.8rem; color: var(--text-dim); margin-top: 0.5rem;">
+                ${genome.fitness.sampleSize} interactions
+              </div>
+            ` : '<div style="color: var(--text-dim);">No data yet</div>'}
           </div>
           <div class="item-card">
             <div class="label">Stats</div>
-            <div style="color: #888; font-size: 0.85rem;">
-              Interactions: ${genome.stats.totalInteractions} •
-              Tokens: ${genome.stats.totalTokens.toLocaleString()} •
-              Cost: $${genome.stats.totalCost.toFixed(4)}
+            <div style="color: var(--text-secondary); font-size: 0.85rem; line-height: 1.8;">
+              <div>💬 ${genome.stats.totalInteractions} interactions</div>
+              <div>🔤 ${genome.stats.totalTokens.toLocaleString()} tokens</div>
+              <div>💰 $${genome.stats.totalCost.toFixed(4)}</div>
             </div>
-          </div>
-          <div class="item-card" style="display: flex; gap: 0.5rem;">
-            <button class="btn" onclick="sendFeedback('positive')" title="Good response">👍</button>
-            <button class="btn" onclick="sendFeedback('negative')" title="Bad response">👎</button>
-            <button class="btn" onclick="showRollback()" title="Rollback version">⏪ Rollback</button>
           </div>
         `;
         
-        // Update genome status in status bar
-        const fitnessEmoji = genome.fitness && genome.fitness.overall >= 0.7 ? '💚' : 
-                           genome.fitness && genome.fitness.overall >= 0.4 ? '💛' : 
-                           genome.fitness ? '❤️' : '⚪';
-        document.getElementById('genome-status').textContent = `Genome v${genome.version} ${fitnessEmoji}`;
+        document.getElementById('genome-status').textContent = `🧬 v${genome.version} ${fitnessEmoji}`;
       } catch {}
 
       // Load memory
       try {
         const res = await fetch('/api/memory', { headers: { 'Authorization': `Bearer ${authToken}` } });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) throw new Error();
         const facts = await res.json();
         document.getElementById('memory-list').innerHTML = facts.length === 0
-          ? '<p style="color: #666;">No memories yet.</p>'
+          ? '<p style="color: var(--text-dim);">No memories yet.</p>'
           : facts.map(f => `
             <div class="item-card">
               <span class="delete" onclick="deleteMemory('${f.id}')">&times;</span>
-              <div class="label">${f.category}</div>
-              ${escapeHtml(f.text)}
+              <div class="label">${escapeHtml(f.category)}</div>
+              <div style="color: var(--text-secondary);">${escapeHtml(f.text)}</div>
             </div>
           `).join('');
       } catch {}
@@ -742,14 +2432,14 @@
       // Load tools
       try {
         const res = await fetch('/api/tools', { headers: { 'Authorization': `Bearer ${authToken}` } });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) throw new Error();
         const tools = await res.json();
         document.getElementById('tools-list').innerHTML = tools.length === 0
-          ? '<p style="color: #666;">No custom tools. Ask Forge to create one!</p>'
+          ? '<p style="color: var(--text-dim);">No custom tools yet.</p>'
           : tools.map(t => `
             <div class="item-card">
-              <div class="label">🔧 ${t.name}</div>
-              ${escapeHtml(t.description)}
+              <div class="label">🔧 ${escapeHtml(t.name)}</div>
+              <div style="color: var(--text-secondary);">${escapeHtml(t.description)}</div>
             </div>
           `).join('');
       } catch {}
@@ -773,69 +2463,27 @@
       return div.innerHTML;
     }
 
-    async function sendFeedback(type) {
-      try {
-        const res = await fetch('/api/genome/feedback', {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`
-          },
-          body: JSON.stringify({ feedback: type, tokens: 0, cost: 0 }),
-        });
-        if (res.ok) {
-          loadSidebarData();
-          alert(`Feedback recorded: ${type}`);
-        }
-      } catch (e) {
-        console.error('Feedback error:', e);
-      }
-    }
-
-    async function showRollback() {
-      try {
-        const res = await fetch('/api/genome/versions', { headers: { 'Authorization': `Bearer ${authToken}` } });
-        if (!res.ok) return;
-        const data = await res.json();
-        
-        if (data.versions.length <= 1) {
-          alert('No previous versions to rollback to');
-          return;
-        }
-        
-        const versions = data.versions.slice(1).map(v => v.version).join(', ');
-        const target = prompt(`Rollback to which version?\nAvailable: ${versions}\nCurrent: ${data.current}`);
-        
-        if (target) {
-          const rollbackRes = await fetch('/api/genome/rollback', {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${authToken}`
-            },
-            body: JSON.stringify({ targetVersion: target }),
-          });
-          const result = await rollbackRes.json();
-          if (result.success) {
-            alert(result.message);
-            loadSidebarData();
-          } else {
-            alert(`Rollback failed: ${result.error}`);
-          }
-        }
-      } catch (e) {
-        console.error('Rollback error:', e);
-      }
-    }
-
+    // Auto-resize textarea
     inputEl.addEventListener('input', () => {
       inputEl.style.height = 'auto';
-      inputEl.style.height = Math.min(inputEl.scrollHeight, 150) + 'px';
+      inputEl.style.height = Math.min(inputEl.scrollHeight, 200) + 'px';
     });
 
-    updateSessionStatus();
-    loadSidebarData();
-    inputEl.focus();
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && document.getElementById('sidebar').classList.contains('open')) {
+        toggleSidebar();
+      }
+      // Mode shortcuts: Cmd/Ctrl + 1-4
+      if ((e.metaKey || e.ctrlKey) && ['1', '2', '3', '4'].includes(e.key)) {
+        e.preventDefault();
+        const modeKeys = ['chat', 'deep', 'evolution', 'swarm'];
+        setMode(modeKeys[parseInt(e.key) - 1]);
+      }
+    });
+
+    // Initialize
+    init();
   </script>
 </body>
 </html>

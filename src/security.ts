@@ -19,7 +19,13 @@ export async function rateLimit(req: Request, res: Response, next: NextFunction)
   }
 }
 
-// Simple token auth middleware
+// Allowed emails for Cloudflare Access authentication
+const ALLOWED_CF_EMAILS = [
+  'ryan.helton@gmail.com',
+  'ryan.helton@pnmac.com',
+];
+
+// Token auth middleware with Cloudflare Access support
 export function tokenAuth(validToken: string) {
   return (req: Request, res: Response, next: NextFunction) => {
     // Skip auth for static files and health check
@@ -27,6 +33,14 @@ export function tokenAuth(validToken: string) {
       return next();
     }
 
+    // Check Cloudflare Access headers first
+    const cfEmail = req.headers['cf-access-authenticated-user-email'] as string;
+    if (cfEmail && ALLOWED_CF_EMAILS.includes(cfEmail.toLowerCase())) {
+      // Authenticated via Cloudflare Access - trust it
+      return next();
+    }
+
+    // Fall back to token auth
     const authHeader = req.headers.authorization;
     const queryToken = req.query.token as string;
     const token = authHeader?.replace('Bearer ', '') || queryToken;
@@ -68,7 +82,7 @@ export function securityHeaders(req: Request, res: Response, next: NextFunction)
   
   // Content Security Policy
   res.setHeader('Content-Security-Policy', 
-    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'"
+    "default-src 'self'; script-src 'self' 'unsafe-inline' cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' cdn.jsdelivr.net; img-src 'self' data:; connect-src 'self'"
   );
 
   next();

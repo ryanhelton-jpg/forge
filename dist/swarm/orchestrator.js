@@ -37,6 +37,8 @@ export class Orchestrator {
         const startedAt = Date.now();
         // Use planner to decompose the task
         const plan = await this.planTask(goal);
+        // Notify that plan is ready
+        this.config.onPlanReady?.(plan);
         // Execute the plan
         const result = await this.executePlan(plan);
         return {

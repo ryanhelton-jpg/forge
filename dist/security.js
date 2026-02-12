@@ -15,13 +15,25 @@ export async function rateLimit(req, res, next) {
         res.status(429).json({ error: 'Too many requests. Slow down.' });
     }
 }
-// Simple token auth middleware
+// Allowed emails for Cloudflare Access authentication
+const ALLOWED_CF_EMAILS = [
+    'ryan.helton@gmail.com',
+    'ryan.helton@pnmac.com',
+];
+// Token auth middleware with Cloudflare Access support
 export function tokenAuth(validToken) {
     return (req, res, next) => {
         // Skip auth for static files and health check
         if (req.path === '/' || req.path.startsWith('/assets') || req.path === '/api/health') {
             return next();
         }
+        // Check Cloudflare Access headers first
+        const cfEmail = req.headers['cf-access-authenticated-user-email'];
+        if (cfEmail && ALLOWED_CF_EMAILS.includes(cfEmail.toLowerCase())) {
+            // Authenticated via Cloudflare Access - trust it
+            return next();
+        }
+        // Fall back to token auth
         const authHeader = req.headers.authorization;
         const queryToken = req.query.token;
         const token = authHeader?.replace('Bearer ', '') || queryToken;
@@ -52,7 +64,7 @@ export function securityHeaders(req, res, next) {
     // Referrer policy
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     // Content Security Policy
-    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'");
+    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' cdn.jsdelivr.net; img-src 'self' data:; connect-src 'self'");
     next();
 }
 // Generate a secure random token

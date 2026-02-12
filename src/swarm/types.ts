@@ -69,6 +69,7 @@ export interface SwarmConfig {
   roles: AgentRole[];
   maxTurnsPerAgent?: number;
   maxTotalTurns?: number;
+  onPlanReady?: (plan: SwarmPlan) => void;
   onThinking?: (roleId: string, thinking: string) => void;
   onAgentStart?: (roleId: string, task: SwarmTask) => void;
   onAgentComplete?: (roleId: string, task: SwarmTask, result: string) => void;

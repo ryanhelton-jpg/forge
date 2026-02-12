@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Living Avatar Prototype</title>
+  <style>
+    body {
+      background: #0a0a0a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      font-family: system-ui;
+      color: #e0e0e0;
+    }
+
+    .avatar-container {
+      position: relative;
+      width: 80px;
+      height: 80px;
+    }
+
+    .avatar-blob {
+      width: 100%;
+      height: 100%;
+      border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+      background: linear-gradient(135deg, var(--blob-color-1), var(--blob-color-2));
+      animation: 
+        morph var(--morph-speed) ease-in-out infinite,
+        float var(--float-speed) ease-in-out infinite,
+        pulse var(--pulse-speed) ease-in-out infinite;
+      box-shadow: 0 0 20px var(--glow-color);
+      transition: all 0.5s ease;
+    }
+
+    /* Eyes */
+    .avatar-eyes {
+      position: absolute;
+      top: 35%;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 12px;
+    }
+
+    .eye {
+      width: 8px;
+      height: 10px;
+      background: #fff;
+      border-radius: 50%;
+      animation: blink 4s ease-in-out infinite;
+    }
+
+    @keyframes morph {
+      0%, 100% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
+      25% { border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%; }
+      50% { border-radius: 50% 60% 30% 60% / 30% 70% 70% 50%; }
+      75% { border-radius: 60% 30% 70% 50% / 60% 30% 40% 70%; }
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-5px); }
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(var(--pulse-scale)); opacity: var(--pulse-opacity); }
+    }
+
+    @keyframes blink {
+      0%, 45%, 55%, 100% { transform: scaleY(1); }
+      50% { transform: scaleY(0.1); }
+    }
+
+    /* Fitness States */
+    .avatar-container[data-fitness="high"] {
+      --blob-color-1: #5bff6b;
+      --blob-color-2: #00d69c;
+      --glow-color: rgba(91, 255, 107, 0.4);
+      --morph-speed: 8s;
+      --float-speed: 3s;
+      --pulse-speed: 4s;
+      --pulse-scale: 1.05;
+      --pulse-opacity: 0.95;
+    }
+
+    .avatar-container[data-fitness="medium"] {
+      --blob-color-1: #ffb35b;
+      --blob-color-2: #ff6b35;
+      --glow-color: rgba(255, 179, 91, 0.3);
+      --morph-speed: 5s;
+      --float-speed: 2s;
+      --pulse-speed: 2.5s;
+      --pulse-scale: 1.08;
+      --pulse-opacity: 0.9;
+    }
+
+    .avatar-container[data-fitness="low"] {
+      --blob-color-1: #ff5555;
+      --blob-color-2: #ff1f00;
+      --glow-color: rgba(255, 85, 85, 0.4);
+      --morph-speed: 2s;
+      --float-speed: 1s;
+      --pulse-speed: 1s;
+      --pulse-scale: 1.15;
+      --pulse-opacity: 0.7;
+    }
+
+    /* Jittery effect for low fitness */
+    .avatar-container[data-fitness="low"] .avatar-blob {
+      animation: 
+        morph 2s ease-in-out infinite,
+        float 1s ease-in-out infinite,
+        pulse 1s ease-in-out infinite,
+        jitter 0.1s linear infinite;
+    }
+
+    @keyframes jitter {
+      0%, 100% { transform: translate(0, 0); }
+      25% { transform: translate(-1px, 1px); }
+      50% { transform: translate(1px, -1px); }
+      75% { transform: translate(-1px, -1px); }
+    }
+
+    /* Controls */
+    .controls {
+      margin-top: 40px;
+      display: flex;
+      gap: 10px;
+    }
+
+    button {
+      background: #222;
+      border: 1px solid #444;
+      color: #e0e0e0;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    button:hover { background: #333; }
+    button.active { border-color: #ff6b35; color: #ff6b35; }
+
+    .fitness-label {
+      margin-top: 20px;
+      font-size: 14px;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+  <div class="avatar-container" id="avatar" data-fitness="high">
+    <div class="avatar-blob"></div>
+    <div class="avatar-eyes">
+      <div class="eye"></div>
+      <div class="eye"></div>
+    </div>
+  </div>
+
+  <p class="fitness-label">Fitness: <span id="fitness-value">0.85</span></p>
+
+  <div class="controls">
+    <button onclick="setFitness('high')" class="active" id="btn-high">High (0.8+)</button>
+    <button onclick="setFitness('medium')" id="btn-medium">Medium (0.5-0.8)</button>
+    <button onclick="setFitness('low')" id="btn-low">Low (&lt;0.5)</button>
+  </div>
+
+  <script>
+    function setFitness(level) {
+      const avatar = document.getElementById('avatar');
+      const label = document.getElementById('fitness-value');
+      
+      avatar.dataset.fitness = level;
+      
+      // Update active button
+      document.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+      document.getElementById('btn-' + level).classList.add('active');
+      
+      // Update label
+      const values = { high: '0.85', medium: '0.62', low: '0.31' };
+      label.textContent = values[level];
+    }
+
+    // For Forge integration, call this with actual fitness score:
+    // setFitnessScore(genome.fitness.overallScore);
+    function setFitnessScore(score) {
+      if (score >= 0.8) setFitness('high');
+      else if (score >= 0.5) setFitness('medium');
+      else setFitness('low');
+    }
+  </script>
+</body>
+</html>
