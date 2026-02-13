@@ -128,7 +128,7 @@ export class Agent {
                     content: messagesWithTools[0].content + this.getToolDescriptions(),
                 };
             }
-            const llmResult = await callLLMWithUsage(messagesWithTools, this.config.apiKey, this.config.model);
+            const llmResult = await callLLMWithUsage(messagesWithTools, this.config.apiKey, this.config.model, this.config.maxTokens || 4096);
             usageStats.push(llmResult.usage);
             // Parse thinking from response
             const { thinking, response } = parseThinking(llmResult.content);

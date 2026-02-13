@@ -145,7 +145,8 @@ function parseUsage(response: OpenRouterResponse, headers: Headers, model: strin
 export async function callLLMWithUsage(
   messages: Message[],
   apiKey: string,
-  model: string = 'anthropic/claude-sonnet-4'
+  model: string = 'anthropic/claude-sonnet-4',
+  maxTokens: number = 4096
 ): Promise<LLMResult> {
   const startTime = Date.now();
   
@@ -164,7 +165,7 @@ export async function callLLMWithUsage(
     },
     body: JSON.stringify({
       model,
-      max_tokens: 1024,
+      max_tokens: maxTokens,
       messages: formattedMessages,
     }),
   });
@@ -188,9 +189,10 @@ export async function callLLMWithUsage(
 export async function callLLM(
   messages: Message[],
   apiKey: string,
-  model: string = 'anthropic/claude-sonnet-4'
+  model: string = 'anthropic/claude-sonnet-4',
+  maxTokens: number = 4096
 ): Promise<string> {
-  const result = await callLLMWithUsage(messages, apiKey, model);
+  const result = await callLLMWithUsage(messages, apiKey, model, maxTokens);
   return result.content;
 }
 
@@ -199,7 +201,8 @@ export async function callLLMStream(
   messages: Message[],
   apiKey: string,
   model: string = 'anthropic/claude-sonnet-4',
-  callbacks: StreamCallback = {}
+  callbacks: StreamCallback = {},
+  maxTokens: number = 4096
 ): Promise<string> {
   const formattedMessages = messages.map(m => ({
     role: m.role,
@@ -216,7 +219,7 @@ export async function callLLMStream(
     },
     body: JSON.stringify({
       model,
-      max_tokens: 1024,
+      max_tokens: maxTokens,
       messages: formattedMessages,
       stream: true,
     }),

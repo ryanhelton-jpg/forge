@@ -47,11 +47,48 @@
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: var(--bg-primary);
+      background: #000;
       color: var(--text-primary);
       height: 100vh;
       display: flex;
       flex-direction: column;
+    }
+
+    /* Main content wrapper - centered column like ChatGPT/Claude */
+    .main-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      max-width: 850px;
+      width: 100%;
+      margin: 0 auto;
+      background: var(--bg-primary);
+      border-left: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+      position: relative;
+      box-shadow: 0 0 60px rgba(0, 0, 0, 0.5);
+    }
+
+    /* On mobile, go full width */
+    @media (max-width: 900px) {
+      .main-content {
+        max-width: 100%;
+        border-left: none;
+        border-right: none;
+        box-shadow: none;
+      }
+    }
+
+    /* Subtle gradient background for dark mode depth */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: radial-gradient(ellipse at center top, #0a0a0f 0%, #000 70%);
+      z-index: -1;
     }
 
     /* Header */
@@ -64,6 +101,33 @@
       background: var(--bg-secondary);
       position: relative;
       overflow: hidden;
+      /* Center header content within the main column */
+    }
+
+    /* Full-width header bar with centered content */
+    .header-wrapper {
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      position: relative;
+    }
+
+    .header-wrapper header {
+      max-width: 850px;
+      margin: 0 auto;
+      border-bottom: none;
+    }
+
+    .header-wrapper .ambient-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+    }
+
+    @media (max-width: 900px) {
+      .header-wrapper header {
+        max-width: 100%;
+      }
     }
 
     /* Ambient gradient bar */
@@ -176,7 +240,7 @@
     #chat {
       flex: 1;
       overflow-y: auto;
-      padding: 1.5rem;
+      padding: 1.5rem 2rem;
       display: flex;
       flex-direction: column;
       gap: 1.25rem;
@@ -185,11 +249,18 @@
 
     /* Messages */
     .message {
-      max-width: 85%;
       padding: 1rem 1.25rem;
       border-radius: 12px;
       line-height: 1.7;
       animation: fadeIn 0.3s ease;
+    }
+
+    .message.user {
+      max-width: 80%;
+    }
+
+    .message.assistant {
+      max-width: 100%;
     }
 
     @keyframes fadeIn {
@@ -526,6 +597,24 @@
       background: var(--bg-secondary);
     }
 
+    /* Full-width input wrapper with centered content */
+    .input-wrapper {
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--border);
+    }
+
+    .input-wrapper #input-area {
+      max-width: 850px;
+      margin: 0 auto;
+      border-top: none;
+    }
+
+    @media (max-width: 900px) {
+      .input-wrapper #input-area {
+        max-width: 100%;
+      }
+    }
+
     #message-input {
       flex: 1;
       background: var(--bg-primary);
@@ -634,12 +723,28 @@
     /* Status Bar */
     .status-bar {
       padding: 0.5rem 1rem;
-      border-top: 1px solid var(--border);
       font-size: 0.75rem;
       color: var(--text-dim);
       display: flex;
       justify-content: space-between;
       background: var(--bg-secondary);
+    }
+
+    /* Full-width status wrapper with centered content */
+    .status-wrapper {
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--border);
+    }
+
+    .status-wrapper .status-bar {
+      max-width: 850px;
+      margin: 0 auto;
+    }
+
+    @media (max-width: 900px) {
+      .status-wrapper .status-bar {
+        max-width: 100%;
+      }
     }
 
     .status-bar span {
@@ -1448,59 +1553,67 @@
     </div>
   </div>
   
-  <header>
-    <div class="header-left">
-      <h1>⚒️ Forge <span>v0.5.1</span></h1>
-      <div class="mode-selector">
-        <button class="mode-btn active" data-mode="chat" onclick="setMode('chat')" title="Normal conversation">
-          <span class="mode-indicator"></span>Chat
-        </button>
-        <button class="mode-btn" data-mode="deep" onclick="setMode('deep')" title="Extended thinking & analysis">
-          <span class="mode-indicator"></span>Deep
-        </button>
-        <button class="mode-btn" data-mode="evolution" onclick="setMode('evolution')" title="Focus on evolving traits">
-          <span class="mode-indicator"></span>Evolve
-        </button>
-        <button class="mode-btn" data-mode="swarm" onclick="setMode('swarm')" title="Multi-agent collaboration">
-          <span class="mode-indicator"></span>Swarm
-        </button>
+  <div class="header-wrapper">
+    <header>
+      <div class="header-left">
+        <h1>⚒️ Forge <span>v0.5.1</span></h1>
+        <div class="mode-selector">
+          <button class="mode-btn active" data-mode="chat" onclick="setMode('chat')" title="Normal conversation">
+            <span class="mode-indicator"></span>Chat
+          </button>
+          <button class="mode-btn" data-mode="deep" onclick="setMode('deep')" title="Extended thinking & analysis">
+            <span class="mode-indicator"></span>Deep
+          </button>
+          <button class="mode-btn" data-mode="evolution" onclick="setMode('evolution')" title="Focus on evolving traits">
+            <span class="mode-indicator"></span>Evolve
+          </button>
+          <button class="mode-btn" data-mode="swarm" onclick="setMode('swarm')" title="Multi-agent collaboration">
+            <span class="mode-indicator"></span>Swarm
+          </button>
+        </div>
       </div>
-    </div>
-    <div class="header-actions">
-      <button class="btn" onclick="toggleSidebar()">⚙️ Config</button>
-      <button class="btn" onclick="newChat()">✨ New</button>
-    </div>
+      <div class="header-actions">
+        <button class="btn" onclick="toggleSidebar()">⚙️ Config</button>
+        <button class="btn" onclick="newChat()">✨ New</button>
+      </div>
+    </header>
     <div class="ambient-bar" id="ambient-bar"></div>
-  </header>
+  </div>
 
-  <div id="chat">
-    <div class="empty-state">
-      <div class="logo">⚒️</div>
-      <div class="title">Self-Evolving AI Agent</div>
-      <div class="subtitle">I learn from your feedback and adapt my personality over time. Every interaction shapes who I become.</div>
-      <div class="feature-badges">
-        <span class="badge" onclick="setMode('chat')">💬 Chat</span>
-        <span class="badge" onclick="setMode('deep')">🧠 Deep Work</span>
-        <span class="badge" onclick="setMode('evolution')">🧬 Evolution Lab</span>
-        <span class="badge" onclick="setMode('swarm')">🐝 Swarm Mission</span>
+  <div class="main-content">
+    <div id="chat">
+      <div class="empty-state">
+        <div class="logo">⚒️</div>
+        <div class="title">Self-Evolving AI Agent</div>
+        <div class="subtitle">I learn from your feedback and adapt my personality over time. Every interaction shapes who I become.</div>
+        <div class="feature-badges">
+          <span class="badge" onclick="setMode('chat')">💬 Chat</span>
+          <span class="badge" onclick="setMode('deep')">🧠 Deep Work</span>
+          <span class="badge" onclick="setMode('evolution')">🧬 Evolution Lab</span>
+          <span class="badge" onclick="setMode('swarm')">🐝 Swarm Mission</span>
+        </div>
       </div>
     </div>
   </div>
 
-  <div id="input-area">
-    <textarea id="message-input" placeholder="Ask me anything..." rows="1" onkeydown="handleKeydown(event)"></textarea>
-    <button id="send-btn" onclick="sendMessage()">
-      <span>Send</span>
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M22 2L11 13M22 2L15 22L11 13L2 9L22 2Z"/>
-      </svg>
-    </button>
+  <div class="input-wrapper">
+    <div id="input-area">
+      <textarea id="message-input" placeholder="Ask me anything..." rows="1" onkeydown="handleKeydown(event)"></textarea>
+      <button id="send-btn" onclick="sendMessage()">
+        <span>Send</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M22 2L11 13M22 2L15 22L11 13L2 9L22 2Z"/>
+        </svg>
+      </button>
+    </div>
   </div>
 
-  <div class="status-bar">
-    <span id="session-status">✨ New session</span>
-    <span id="mode-status">💬 Chat Mode</span>
-    <span id="genome-status">🧬 Loading...</span>
+  <div class="status-wrapper">
+    <div class="status-bar">
+      <span id="session-status">✨ New session</span>
+      <span id="mode-status">💬 Chat Mode</span>
+      <span id="genome-status">🧬 Loading...</span>
+    </div>
   </div>
 
   <div class="sidebar" id="sidebar">
@@ -2243,7 +2356,7 @@
         const startRes = await fetch('/api/swarm', {
           method: 'POST',
           headers,
-          body: JSON.stringify({ goal: message, async: true }),
+          body: JSON.stringify({ goal: message, async: true, sessionId }),
         });
         
         if (!startRes.ok) {

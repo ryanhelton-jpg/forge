@@ -13,6 +13,7 @@ export interface AgentRole {
   tools?: Tool[];
   temperature?: number;
   model?: string; // Override default model per role
+  maxTokens?: number; // Override max output tokens per role
 }
 
 /**

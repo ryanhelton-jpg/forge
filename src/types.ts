@@ -28,6 +28,7 @@ export interface AgentConfig {
   apiKey: string;
   systemPrompt?: string;
   maxTurns?: number;
+  maxTokens?: number; // Max output tokens per LLM call
 }
 
 export interface AgentState {

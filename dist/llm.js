@@ -95,7 +95,7 @@ function parseUsage(response, headers, model) {
 /**
  * Call LLM and return content with usage stats
  */
-export async function callLLMWithUsage(messages, apiKey, model = 'anthropic/claude-sonnet-4') {
+export async function callLLMWithUsage(messages, apiKey, model = 'anthropic/claude-sonnet-4', maxTokens = 4096) {
     const startTime = Date.now();
     const formattedMessages = messages.map(m => ({
         role: m.role,
@@ -111,7 +111,7 @@ export async function callLLMWithUsage(messages, apiKey, model = 'anthropic/clau
         },
         body: JSON.stringify({
             model,
-            max_tokens: 1024,
+            max_tokens: maxTokens,
             messages: formattedMessages,
         }),
     });
@@ -128,12 +128,12 @@ export async function callLLMWithUsage(messages, apiKey, model = 'anthropic/clau
 /**
  * Call LLM (legacy - returns content only)
  */
-export async function callLLM(messages, apiKey, model = 'anthropic/claude-sonnet-4') {
-    const result = await callLLMWithUsage(messages, apiKey, model);
+export async function callLLM(messages, apiKey, model = 'anthropic/claude-sonnet-4', maxTokens = 4096) {
+    const result = await callLLMWithUsage(messages, apiKey, model, maxTokens);
     return result.content;
 }
 // Streaming version for thinking display
-export async function callLLMStream(messages, apiKey, model = 'anthropic/claude-sonnet-4', callbacks = {}) {
+export async function callLLMStream(messages, apiKey, model = 'anthropic/claude-sonnet-4', callbacks = {}, maxTokens = 4096) {
     const formattedMessages = messages.map(m => ({
         role: m.role,
         content: m.content,
@@ -148,7 +148,7 @@ export async function callLLMStream(messages, apiKey, model = 'anthropic/claude-
         },
         body: JSON.stringify({
             model,
-            max_tokens: 1024,
+            max_tokens: maxTokens,
             messages: formattedMessages,
             stream: true,
         }),

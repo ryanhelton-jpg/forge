@@ -10,6 +10,7 @@ export interface AgentRole {
     tools?: Tool[];
     temperature?: number;
     model?: string;
+    maxTokens?: number;
 }
 /**
  * Task that gets assigned to agents

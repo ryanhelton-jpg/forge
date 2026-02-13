@@ -16,12 +16,12 @@ export interface LLMResult {
 /**
  * Call LLM and return content with usage stats
  */
-export declare function callLLMWithUsage(messages: Message[], apiKey: string, model?: string): Promise<LLMResult>;
+export declare function callLLMWithUsage(messages: Message[], apiKey: string, model?: string, maxTokens?: number): Promise<LLMResult>;
 /**
  * Call LLM (legacy - returns content only)
  */
-export declare function callLLM(messages: Message[], apiKey: string, model?: string): Promise<string>;
-export declare function callLLMStream(messages: Message[], apiKey: string, model?: string, callbacks?: StreamCallback): Promise<string>;
+export declare function callLLM(messages: Message[], apiKey: string, model?: string, maxTokens?: number): Promise<string>;
+export declare function callLLMStream(messages: Message[], apiKey: string, model?: string, callbacks?: StreamCallback, maxTokens?: number): Promise<string>;
 export declare function parseThinking(content: string): {
     thinking: string | null;
     response: string;

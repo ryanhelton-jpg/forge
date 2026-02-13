@@ -332,6 +332,7 @@ export class Orchestrator {
       apiKey: this.config.apiKey,
       systemPrompt: role.systemPrompt,
       maxTurns: this.config.maxTurnsPerAgent || 5,
+      maxTokens: role.maxTokens || 4096, // Use role's token limit or default
     });
 
     // Register role-specific tools

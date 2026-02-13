@@ -17,6 +17,7 @@ import { toolCreatorTool, loadAllCustomTools } from './tools/tool-creator.js';
 import { webSearchTool } from './tools/web-search.js';
 import { httpFetchTool } from './tools/http-fetch.js';
 import { readFileTool, writeFileTool, listFilesTool } from './tools/file-ops.js';
+import { execTool } from './tools/exec.js';
 import { rateLimit, sanitizeInput, securityHeaders, generateToken, tokenAuth } from './security.js';
 import { Orchestrator, builtInRoles } from './swarm/index.js';
 import type { SwarmPlan, SwarmTask, BlackboardEntry } from './swarm/types.js';
@@ -137,6 +138,7 @@ function getOrCreateSession(sessionId: string): Agent {
     agent.registerTool(readFileTool);
     agent.registerTool(writeFileTool);
     agent.registerTool(listFilesTool);
+    agent.registerTool(execTool);
 
     // Load and register custom tools
     const customTools = loadAllCustomTools();
@@ -509,7 +511,8 @@ async function runSwarmAsync(
   goal: string | undefined, 
   plan: SwarmPlan | undefined, 
   protocol: string | undefined,
-  agentsUsed: string[]
+  agentsUsed: string[],
+  sessionId?: string
 ) {
   const swarmGoal = goal || plan?.goal || 'Unknown goal';
   const totalTasks = plan?.tasks?.length || 0;
@@ -624,6 +627,28 @@ async function runSwarmAsync(
         result: t.result 
       })),
     });
+    
+    // CRITICAL: Inject swarm results into conversation history
+    // This allows the chat agent to remember what the swarm produced
+    if (sessionId) {
+      const session = sessions.get(sessionId);
+      if (session) {
+        const history = session.agent.getHistory();
+        history.push({ role: 'user', content: `[Swarm Mission] ${swarmGoal}` });
+        history.push({ role: 'assistant', content: result.finalOutput });
+        memory.updateConversation(sessionId, history);
+      } else {
+        // Session doesn't exist in memory, create/update conversation directly
+        let conv = memory.getConversation(sessionId);
+        if (!conv) {
+          conv = memory.createConversation(sessionId);
+        }
+        const messages = conv.messages || [];
+        messages.push({ role: 'user', content: `[Swarm Mission] ${swarmGoal}` });
+        messages.push({ role: 'assistant', content: result.finalOutput });
+        memory.updateConversation(sessionId, messages);
+      }
+    }
   } catch (error) {
     console.error('Async swarm error:', error);
     executionLog.failRun(runId, error instanceof Error ? error.message : 'Unknown error');
@@ -640,7 +665,7 @@ async function runSwarmAsync(
 
 // Swarm execution endpoint
 app.post('/api/swarm', async (req, res) => {
-  const { goal, plan, protocol, async: asyncMode } = req.body;
+  const { goal, plan, protocol, async: asyncMode, sessionId } = req.body;
 
   if (!goal && !plan) {
     return res.status(400).json({ error: 'Goal or plan required' });
@@ -650,7 +675,7 @@ app.post('/api/swarm', async (req, res) => {
   const runId = executionLog.startRun('swarm', { 
     goal: goal || plan?.goal, 
     plan 
-  });
+  }, sessionId);
   executionLog.updateRunModel(runId, 'anthropic/claude-sonnet-4');
 
   const agentsUsed: string[] = [];
@@ -658,7 +683,7 @@ app.post('/api/swarm', async (req, res) => {
   // If async mode, return immediately with runId
   if (asyncMode) {
     // Run swarm in background
-    runSwarmAsync(runId, goal, plan, protocol, agentsUsed);
+    runSwarmAsync(runId, goal, plan, protocol, agentsUsed, sessionId);
     return res.json({ runId, status: 'started', goal: goal || plan?.goal });
   }
   
@@ -798,6 +823,28 @@ app.post('/api/swarm', async (req, res) => {
         result: t.result 
       })),
     });
+    
+    // CRITICAL: Inject swarm results into conversation history
+    // This allows the chat agent to remember what the swarm produced
+    if (sessionId) {
+      const session = sessions.get(sessionId);
+      if (session) {
+        const history = session.agent.getHistory();
+        history.push({ role: 'user', content: `[Swarm Mission] ${swarmGoal}` });
+        history.push({ role: 'assistant', content: result.finalOutput });
+        memory.updateConversation(sessionId, history);
+      } else {
+        // Session doesn't exist in memory, create/update conversation directly
+        let conv = memory.getConversation(sessionId);
+        if (!conv) {
+          conv = memory.createConversation(sessionId);
+        }
+        const messages = conv.messages || [];
+        messages.push({ role: 'user', content: `[Swarm Mission] ${swarmGoal}` });
+        messages.push({ role: 'assistant', content: result.finalOutput });
+        memory.updateConversation(sessionId, messages);
+      }
+    }
 
     res.json({ ...result, runId });
   } catch (error) {

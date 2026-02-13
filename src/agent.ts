@@ -173,7 +173,8 @@ export class Agent {
       const llmResult = await callLLMWithUsage(
         messagesWithTools,
         this.config.apiKey,
-        this.config.model
+        this.config.model,
+        this.config.maxTokens || 4096
       );
       
       usageStats.push(llmResult.usage);

@@ -22,6 +22,7 @@ export interface AgentConfig {
     apiKey: string;
     systemPrompt?: string;
     maxTurns?: number;
+    maxTokens?: number;
 }
 export interface AgentState {
     messages: Message[];
