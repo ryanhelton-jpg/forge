@@ -1,212 +1,29 @@
 # ⚒️ Forge
 
+> **⚠️ Archived — Feb 2026**
+> This project has been archived. Development has moved to [OpenClaw](https://github.com/openclaw/openclaw).
+> The ideas explored here (genome/fitness tracking, agent swarm orchestration, self-evolving personas) were good ones — they just got absorbed into a better-resourced system.
+
+---
+
 **Self-evolving AI agent framework — built from scratch.**
 
 An AI agent that can modify its own personality, create its own tools, track its fitness, and evolve based on feedback. No magic. No bloat.
 
-## Quick Start
+## What Was Interesting Here
 
-```bash
-# Install globally
-npm install -g @ryanhelton/forge
-
-# Configure (first time)
-forge setup
-
-# Start the server
-forge start
-```
-
-Then open `http://localhost:3030` and enter your auth token.
-
-## Features
-
-### 🧬 Genome System (v0.5+)
-Forge has a living "genome" that defines its identity:
-
-- **Traits** — Personality characteristics with weights (e.g., "concise" at 90%)
-- **Rules** — Behavioral constraints (must/should/prefer/avoid)
-- **Skills** — Learned capabilities tracked over time
-- **Config** — Model settings, memory limits, evolution preferences
-
-All changes are tracked as **mutations** with semantic versioning.
+### 🧬 Genome System
+A living config that defined the agent's identity — traits with weights, behavioral rules, learned skills — all tracked as mutations with semantic versioning. Rollback to any prior version. The idea: an agent's personality should be versioned and auditable, not a black box prompt.
 
 ### 📊 Fitness Tracking
-Every interaction is measured:
-- **Task completion** — Did it successfully help?
-- **User satisfaction** — 👍/👎 feedback from users
-- **Efficiency** — Tokens per successful task
-- **Reliability** — Error rate
+Every interaction scored on task completion, user satisfaction, token efficiency, and error rate. Low fitness → evolution proposals. The insight: continuous feedback loops matter more than prompt engineering.
 
-Low fitness triggers **evolution proposals** — suggested changes to improve.
-
-### 🔄 Version Control
-- Full mutation history with diffs
-- **Rollback** to any previous version
-- **Fork** genomes to experiment
-- Semantic versioning (major.minor.patch)
-
-### 🧠 Thinking Stream
-See how Forge reasons through problems:
-- Internal monologue displayed before answers
-- Understand the "why" behind responses
+### 🐝 Agent Swarm
+Multi-agent collaboration with defined roles: planner, researcher, coder, critic, synthesizer. State persisted to disk for restart recovery. The lesson: role specialization beats a single generalist agent for complex tasks.
 
 ### 🔧 Live Tool Creation
-Forge can build its own tools:
-- Describe what you need → it writes the code
-- Tools persist and work in future sessions
-
-### 🐝 Agent Swarm (v0.4+)
-Multiple specialized agents collaborate:
-
-| Role | Purpose |
-|------|---------|
-| `planner` | Decomposes tasks into subtasks |
-| `researcher` | Gathers information |
-| `coder` | Implements solutions |
-| `critic` | Reviews work, identifies issues |
-| `synthesizer` | Combines outputs into final result |
-
-### 🌐 External Tools (v0.5+)
-| Tool | Purpose |
-|------|---------|
-| `web_search` | Search the internet (Brave Search) |
-| `http_fetch` | Make HTTP requests |
-| `read_file` | Read files from disk |
-| `write_file` | Write files to disk |
-| `list_files` | List directory contents |
-
-## API Endpoints
-
-### Chat
-```bash
-POST /api/chat
-# Body: { "message": "Hello", "sessionId": "optional-uuid" }
-# Returns: { response, thinking, usage, evolutionProposals? }
-```
-
-### Genome
-```bash
-GET  /api/genome              # Get full genome
-GET  /api/genome/versions     # Version history
-GET  /api/genome/mutations    # Mutation log
-GET  /api/genome/fitness      # Fitness metrics
-GET  /api/genome/proposals    # Evolution proposals
-
-POST /api/genome/trait        # Add trait: { name, weight?, description? }
-DELETE /api/genome/trait/:id  # Remove trait
-
-POST /api/genome/rule         # Add rule: { description, type?, priority? }
-DELETE /api/genome/rule/:id   # Remove rule
-
-POST /api/genome/feedback     # Record feedback: { feedback: "positive"|"negative" }
-POST /api/genome/rollback     # Rollback: { targetVersion: "1.0.0" }
-POST /api/genome/evolve       # Apply proposal: { type, description }
-```
-
-### Swarm
-```bash
-POST /api/swarm               # Run swarm: { goal: "Build a REST API" }
-GET  /api/swarm/roles         # List available roles
-GET  /api/swarm/active        # Check running swarms
-GET  /api/swarm/:runId/status # Swarm status
-```
-
-### Other
-```bash
-GET  /api/health              # Health check + stats
-GET  /api/persona             # Current persona
-GET  /api/tools               # Available tools
-GET  /api/memory              # Stored facts
-GET  /api/runs                # Execution history
-```
-
-## Configuration
-
-Config stored in `~/.forge/`:
-- `config.json` — API key, port, auth token
-- `data/` — Memory, personas, custom tools, genome.db
-
-### Environment Variables
-| Variable | Description |
-|----------|-------------|
-| `OPENROUTER_API_KEY` | API key for OpenRouter |
-| `BRAVE_API_KEY` | API key for web search (optional) |
-| `PORT` | Server port (default: 3030) |
-| `FORGE_TOKEN` | Auth token for web UI |
-| `DATA_DIR` | Data storage directory |
-
-## Architecture
-
-```
-forge/
-├── bin/forge.js           # CLI entry point
-├── src/
-│   ├── server.ts          # Express server + API routes
-│   ├── agent.ts           # Core agent loop
-│   ├── genome-store.ts    # SQLite genome persistence
-│   ├── genome/            # Genome types, mutations, versioning
-│   ├── llm.ts             # LLM interface
-│   ├── memory.ts          # Persistent memory
-│   ├── tools/             # Built-in tools
-│   └── swarm/             # Multi-agent orchestration
-├── public/                # Web UI
-├── data/                  # Runtime data
-│   ├── genome.db          # SQLite database
-│   └── persona.json       # Active persona
-└── packages/              # Monorepo packages (WIP)
-    ├── core/              # Shared types
-    ├── genome/            # Genome package
-    ├── api/               # API server (planned)
-    └── runtime/           # Agent runtime (planned)
-```
-
-## Evolution Flow
-
-```
-Interaction → Track success/tokens/cost
-                    ↓
-            User gives feedback (👍/👎)
-                    ↓
-            Fitness metrics update
-                    ↓
-            If fitness < threshold
-                    ↓
-            Generate proposals
-                    ↓
-            User applies or dismisses
-                    ↓
-            Mutation recorded → Version bumps
-                    ↓
-            Persona syncs
-```
-
-## Development
-
-```bash
-# Clone
-git clone https://github.com/ryanhelton/forge.git
-cd forge
-
-# Install deps
-npm install
-
-# Run in dev mode
-npm run dev
-
-# Build for production
-npm run build
-
-# Initialize database
-node scripts/init-db.js
-```
-
-## Why "Forge"?
-
-Because we're building tools. And forging new paths in AI.
+Agents describing what they need → writing the code → persisting tools for future sessions. Self-extending capability without redeployment.
 
 ---
 
-**Built for learning. Built for fun. Built to evolve.**
-
-MIT License • [Ryan Helton](https://github.com/ryanhelton)
+*Built Feb 2026. MIT License.*
